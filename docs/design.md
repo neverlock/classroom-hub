@@ -18,7 +18,7 @@
 | บทบาท | ยืนยันตัวตน | ทำอะไรได้ |
 |---|---|---|
 | Super admin | Cloudflare Access (email) อยู่ใน env `SUPER_ADMINS` | สร้าง/ปิด class, ตั้ง class admin, ทำได้ทุกอย่าง |
-| Class admin | Cloudflare Access (email) อยู่ในตาราง `class_admins` | จัดการข้อมูลห้องตัวเอง, เพิ่ม/ลบนักเรียน, แก้/ลบ/ซ่อน post ของใครก็ได้ในห้อง |
+| Class admin | **ชื่อผู้บันทึก + รหัสแอดมินห้อง** กรอกครั้งเดียว จำใน cookie (ไม่ต้อง login ทุกครั้ง) | บันทึก/แก้/ลบสิ่งที่เรียนและการบ้าน, จัดการวิชาและนักเรียน, ซ่อน/ลบข้อความของใครก็ได้ในห้อง |
 | Member | รหัสนักเรียน (ไม่มี password) | สร้างและแก้ไข post ของตัวเอง, แนบรูป |
 | ผู้เยี่ยมชม | ไม่ต้องทำอะไร | อ่านอย่างเดียว |
 
@@ -33,8 +33,9 @@
 
 ### ข้อสมมติเริ่มต้น (ยังเปลี่ยนได้)
 
-- Member แก้ได้เฉพาะ post ของตัวเอง
-- `homework` / `lesson` ลงโดย class admin เป็นหลัก ส่วน member โพสต์ `note` และแนบรูป
+- Member แก้ได้เฉพาะข้อความ (note) ของตัวเอง
+- สิ่งที่เรียน/การบ้าน (`entries`) ลงโดย class admin เท่านั้น ส่วน member โพสต์ข้อความ (`notes`) และแนบรูป
+- Class admin ใช้ "ชื่อ + รหัสแอดมินห้อง" แทน Cloudflare Access: รหัสเป็นความลับร่วมของแอดมินห้อง (เก็บเป็น hash) ชื่อที่กรอกใช้บันทึกว่าใครเป็นคนลง เปลี่ยนรหัสเมื่อไรทุกเครื่องต้องกรอกใหม่ (เก็บ `pin_version` ใน cookie) Super admin ยังใช้ Cloudflare Access
 - อ่านได้ทุกคนโดยไม่ต้องกรอกอะไร
 - รูป: ไม่เกิน 3 รูปต่อ post รับไฟล์ต้นฉบับขนาดเท่าไรก็ได้ แล้วย่อฝั่ง client ก่อนอัปโหลด (ดูหัวข้อ 5)
 
@@ -134,33 +135,61 @@ Cloudflare ทั้งหมด:
 ## 8. โครงสร้างข้อมูล
 
 ```
-classes        id, slug (unique), name, active, created_at
-class_admins   class_id, email                      -- unique(class_id, email)
-students       id, class_id, student_code, seat_no, active
-                                                    -- unique(class_id, student_code)
-posts          id, class_id, student_id (null = admin โพสต์), author_email (null = member),
-               kind, subject, title, body, due_date, status,
-               hidden, created_at, updated_at
-attachments    id, post_id, r2_key, size, created_at
+classes      id, slug (unique), name, admin_pin_hash, pin_version, active, created_at
+subjects     id, class_id, code (เช่น ค21103), name, sort_order, active
+students     id, class_id, student_code, seat_no, active
+                                                  -- unique(class_id, student_code)
+entries      id, class_id, entry_date, subject_id,
+             lesson,                              -- งานในคาบ / สิ่งที่เรียน
+             has_homework, homework_detail, homework_due,
+             author_name, hidden, created_at, updated_at
+                                                  -- unique(class_id, entry_date, subject_id)
+notes        id, class_id, student_id, body, hidden, created_at, updated_at
+attachments  id, entry_id (null), note_id (null), r2_key, size, created_at
 ```
 
 - Super admin ไม่มีตาราง ใช้ env `SUPER_ADMINS=a@x.com,b@x.com`
-- `kind`: `homework` (มี `due_date`, `status` = pending/done) | `lesson` | `note`
-- แสดงผล "เลขที่ N" จาก join `posts.student_id → students.seat_no`
+- `entries` คือ 1 วิชาต่อ 1 วัน รวมสิ่งที่เรียนและการบ้านไว้ใน record เดียว (ตามระบบเดิม) ถ้าเลือกวัน+วิชาที่มีแล้ว ฟอร์มจะเปิดโหมดแก้ไขของเดิมแทนการสร้างซ้ำ
+- "การบ้านที่ต้องส่ง" = `entries` ที่ `has_homework` และ `homework_due >= วันนี้` เรียงตามกำหนดส่ง
+- แสดง "เลขที่ N" ของ note จาก join `notes.student_id → students.seat_no`
 - ใช้ soft delete ผ่าน `hidden` เพื่อกู้คืนได้
 
 ## 9. เส้นทาง (routes)
 
 ```
 /                      รายการห้อง (redirect ถ้ามีห้องเดียว)
-/c/{slug}              ฟีดวันนี้: งานค้าง + สิ่งที่เรียน + note
-/c/{slug}/archive      ย้อนหลัง กรองตามวัน/วิชา
-/c/{slug}/new          ฟอร์มโพสต์ (กรอกรหัสนักเรียน)
-/admin                 super admin: จัดการห้อง, class admin
-/admin/c/{slug}        class admin: นักเรียน, post, ตั้งค่าห้อง
+/c/{slug}              หน้าหลัก (หน้าเดียวแบบระบบเดิม): ปุ่มบันทึก + เลือกวัน + สิ่งที่เรียน + การบ้านที่ต้องส่ง + ข้อความ
+/c/{slug}/manage       class admin: วิชา, นักเรียน, รหัสแอดมินห้อง
+/admin                 super admin: สร้าง/ปิดห้อง ตั้งรหัสแอดมินห้อง
 ```
 
-`/admin/*` และ API เขียนฝั่ง admin ป้องกันด้วย Cloudflare Access แล้วตรวจ email กับ `SUPER_ADMINS` / `class_admins` ใน Worker อีกชั้น
+- ไม่มีหน้า archive แยก: "ดูย้อนหลัง" คือการเลือกวันในหน้าหลัก (เหมือนระบบเดิม)
+- `/admin/*` ป้องกันด้วย Cloudflare Access แล้วตรวจ email กับ `SUPER_ADMINS` ใน Worker อีกชั้น
+- API เขียนของ class admin ตรวจ cookie ที่เซ็นแล้ว (ชื่อ + `pin_version`) ทุกครั้ง
+
+## 9.1 หน้าหลัก (อิงระบบเดิม Google Apps Script)
+
+คงโครงเดิมให้คนในห้องไม่ต้องปรับตัว: ธีมน้ำตาล-เหลือง-ครีม, ปุ่มเหลืองใหญ่ด้านบน, เลือกวัน, การ์ดรายวิชา, ส่วนการบ้านที่ต้องส่ง
+
+```
+บันทึกการเรียนการสอน {ชื่อห้อง}
+[ + บันทึกสิ่งที่เรียน / การบ้านใหม่ ]   ← กดแล้วฟอร์มขยายออกในหน้าเดิม
+📅 เลือกวันที่ดูข้อมูล: [ วันที่ ]   [‹ วันก่อน] [วันนี้] [วันถัดไป ›]
+📚 สิ่งที่เรียน (ตามวันที่เลือก)
+   การ์ดต่อวิชา 2 คอลัมน์บนจอใหญ่ / 1 คอลัมน์บนมือถือ
+   - มีการบ้าน: ขอบเหลือง, ป้าย "มีการบ้าน" + "ส่ง: วันที่", โจทย์การบ้าน
+   - ไม่มีการบ้าน: ✓ ไม่มีการบ้าน (เขียว)
+   - Class admin เห็นปุ่ม ✎ แก้ไข / 🗑 ลบ ที่การ์ด
+📌 การบ้านที่ต้องส่ง (เรียงตามกำหนด)
+   ว่าง → "ยอดเยี่ยมมาก! ไม่มีการบ้านค้างเลยครับ"
+💬 ข้อความจากเพื่อน (เลขที่ N · เวลา · ข้อความ · รูป) + [ + เขียนข้อความ ]
+```
+
+**ฟอร์มบันทึก (ขยายใต้ปุ่มเหลือง)** ฟิลด์: วันที่เรียน (default วันนี้) → วิชา (เลือกจากวิชาของห้อง) → สิ่งที่เรียนวันนี้ → การบ้าน (ไม่มี/มี) ถ้า "มี" จึงโชว์ โจทย์การบ้าน + วันที่ส่ง (default วันถัดไป) + แนบรูปได้ (ไม่เกิน 3) → [บันทึกข้อมูล]
+
+**การระบุตัวตนครั้งแรก:** กดปุ่มเหลืองบนอุปกรณ์ที่ยังไม่เคยระบุ จะขึ้นกล่องในหน้าเดิมให้กรอก "ชื่อผู้บันทึก" + "รหัสแอดมินห้อง" ครั้งเดียว แล้วจำใน cookie (~90 วัน) หลังจากนั้นกดแล้วเห็นฟอร์มทันที และแสดง "บันทึกโดย: {ชื่อ} (ไม่ใช่ฉัน?)" ไว้ในฟอร์ม
+
+**ข้อความจากเพื่อน:** กรอกรหัสนักเรียนครั้งเดียวแล้วจำใน cookie เช่นกัน แสดงผลเป็น "เลขที่ N"
 
 ## 10. ลำดับการพัฒนา
 
