@@ -39,3 +39,4 @@ npm run build && npm run preview # ทดลองบน workerd จริง (�
 
 `main` คือ production: เว็บจริงเปลี่ยนเมื่อมีคอมมิตใหม่เข้า `main` เท่านั้น ทำงานบน branch แยกแล้วเปิด Pull Request เข้า `main`
 รายละเอียดการตั้งค่า Cloudflare, secret, migration, สำรองข้อมูลและย้อนกลับ: [`docs/deploy.md`](docs/deploy.md)
+
