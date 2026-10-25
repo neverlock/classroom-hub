@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>จัดการห้องเรียน</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600&family=Sarabun:wght@400;500;700&display=swap">
+<style>
+/* Layout: mobile-first single column; three tabs (วิชา / นักเรียน / ตั้งค่า) under the class title, same brown-yellow-cream identity as the main page. */
+:root{
+  --bg:#f5efe3; --surface:#ffffff; --ink:#43291a; --muted:#85705c; --line:#e6dccb;
+  --accent:#ffcc0a; --accent-ink:#43291a; --hw-bg:#fff7d6; --hw-line:#f1c40f;
+  --good:#2f8a3e; --danger:#b83a2a; --panel:#efe7da; --focus:#1b6fd8;
+  --font-display:'Prompt','Sarabun',system-ui,sans-serif;
+  --font-body:'Sarabun','Noto Sans Thai',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1b140e; --surface:#2a2017; --ink:#f4e9d7; --muted:#b9a68e; --line:#43362a;
+  --accent:#ffcc0a; --accent-ink:#2a1a0c; --hw-bg:#3a3010; --hw-line:#c9a008;
+  --good:#6fcb7e; --danger:#ff8d7a; --panel:#33281d; --focus:#7db4ff; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1b140e; --surface:#2a2017; --ink:#f4e9d7; --muted:#b9a68e; --line:#43362a;
+  --accent:#ffcc0a; --accent-ink:#2a1a0c; --hw-bg:#3a3010; --hw-line:#c9a008;
+  --good:#6fcb7e; --danger:#ff8d7a; --panel:#33281d; --focus:#7db4ff; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.55;
+  padding-block:20px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:760px;margin:0 auto;background:var(--surface);border-radius:20px;border-top:12px solid var(--ink);padding:22px 16px 30px;box-shadow:0 8px 30px rgba(67,41,26,.10)}
+h1{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,4.6vw,30px);text-align:center;margin:6px 0 4px;text-wrap:balance}
+h2{font-family:var(--font-display);font-weight:600;font-size:19px;margin:0 0 4px}
+.sub{text-align:center;color:var(--muted);font-size:14px;margin:0 0 12px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.mock{font-size:12px;padding:3px 12px;border-radius:99px;border:1px dashed var(--muted);color:var(--muted)}
+.rule{height:3px;background:var(--accent);border:0;margin:10px 0 16px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+label{display:block;font-weight:700;margin:14px 0 5px}
+input[type=text],input[type=password],textarea{width:100%;min-height:46px;font-size:16px;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+textarea{min-height:96px;resize:vertical}
+.btn{border:0;border-radius:10px;padding:12px 16px;background:var(--ink);color:var(--accent);font-weight:700;cursor:pointer;width:100%;margin-top:14px;font-size:17px;min-height:48px}
+.btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--ink);width:auto;margin:0}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0 6px;min-height:44px;font-size:14px}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+.err{color:var(--danger);font-size:14px;margin:8px 0 0;min-height:1.2em}
+.who{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;font-size:14px;color:var(--muted)}
+
+/* tabs */
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--panel);padding:5px;border-radius:14px;margin:8px 0 16px}
+.tab{border:0;background:transparent;border-radius:10px;min-height:46px;font-family:var(--font-display);font-weight:600;font-size:15px;cursor:pointer;padding:6px 4px}
+.tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+
+/* rows */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+.card.add{background:var(--hw-bg);border:1.5px dashed var(--hw-line)}
+.list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.row{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--ink);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.row.off{opacity:.6;border-left-color:var(--muted)}
+.rmain{min-width:0;overflow-wrap:anywhere}
+.rmain small{display:block;color:var(--muted);font-size:13px}
+.rtools{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.rtools button,.ibtn{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:0;width:100%;height:44px;padding:0 4px;cursor:pointer;font-size:16px}
+.rtools button.sure{background:var(--danger);color:#fff;border-color:var(--danger);font-size:14px;font-weight:700}
+.rtools button:disabled{opacity:.35;cursor:not-allowed}
+.pill{display:inline-block;font-size:12px;border-radius:99px;padding:0 9px;background:var(--panel);color:var(--muted);margin-left:6px}
+.seat{display:inline-grid;place-items:center;min-width:44px;height:30px;padding:0 8px;border-radius:8px;background:var(--ink);color:var(--accent);font-weight:700;margin-right:8px}
+.editgrid{display:grid;grid-template-columns:1fr;gap:8px}
+.editgrid .row2{display:flex;gap:8px}
+.editgrid .row2 .btn{margin:0;flex:1}
+.stats{display:flex;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin-top:12px}
+.preview{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px;max-height:220px;overflow-y:auto}
+.preview li{display:flex;gap:8px;align-items:baseline;border-bottom:1px dashed var(--line);padding:3px 0;min-width:0}
+.preview .ok{color:var(--good);font-weight:700}
+.preview .bad{color:var(--danger);font-weight:700}
+.warn{background:var(--hw-bg);border:1px solid var(--hw-line);border-radius:10px;padding:10px 12px;font-size:14px;margin-top:10px}
+.empty{border:1.5px dashed var(--line);border-radius:12px;padding:18px 12px;text-align:center;color:var(--muted);margin-top:12px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:11px 20px;border-radius:99px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:20;max-width:calc(100% - 32px)}
+@media (min-width:561px){
+  .wrap{padding:30px 36px 36px}
+  .row{flex-direction:row;align-items:center;justify-content:space-between}
+  .rtools{display:flex;flex-wrap:wrap;gap:8px}
+  .rtools button{width:auto;min-width:44px;padding:0 10px}
+  .editgrid{grid-template-columns:1fr 1fr auto}
+  .editgrid .row2{grid-column:auto}
+  .btn{width:auto;padding-inline:28px}
+}
+</style>
+
+<div class="wrap">
+  <div class="topbar"><button class="linkbtn" id="back" type="button">← กลับหน้าหลัก</button><span class="mock">ตัวอย่างหน้าตา · ข้อมูลสมมติ</span></div>
+  <h1 id="title">จัดการห้อง</h1>
+  <p class="sub">วิชา · นักเรียน · ตั้งค่า</p>
+  <hr class="rule">
+
+  <section id="gate">
+    <h2>หน้านี้สำหรับแอดมินห้อง</h2>
+    <label for="gname">ชื่อผู้บันทึก</label>
+    <input type="text" id="gname" autocomplete="off" placeholder="เช่น แม่น้องมาย / ครูต้น">
+    <label for="gpin">รหัสแอดมินห้อง</label>
+    <input type="password" id="gpin" autocomplete="off" inputmode="numeric">
+    <p class="hint">ตัวอย่างนี้ใช้รหัส <b>1234</b> · ถ้าเคยกรอกบนเครื่องนี้แล้วจะเข้าหน้านี้ได้ทันที</p>
+    <p class="err" id="gerr" role="alert"></p>
+    <button class="btn" id="ggo" type="button">เข้าสู่หน้าจัดการ</button>
+  </section>
+
+  <div id="app" hidden>
+    <div class="who"><span>บันทึกโดย: <b id="whoName"></b></span><button class="linkbtn" id="notme" type="button">ไม่ใช่ฉัน?</button></div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="t-subjects" aria-selected="true" aria-controls="p-subjects" type="button">📚 วิชา</button>
+      <button class="tab" role="tab" id="t-students" aria-selected="false" aria-controls="p-students" type="button">🧒 นักเรียน</button>
+      <button class="tab" role="tab" id="t-settings" aria-selected="false" aria-controls="p-settings" type="button">⚙ ตั้งค่า</button>
+    </div>
+
+    <!-- วิชา -->
+    <section id="p-subjects" role="tabpanel" aria-labelledby="t-subjects">
+      <h2>วิชาของห้อง</h2>
+      <p class="hint">วิชาที่แสดงในช่อง "เลือกวิชา" ตอนบันทึก เรียงตามลำดับนี้ ใช้ปุ่ม ▲ ▼ เลื่อนลำดับ</p>
+      <ul class="list" id="subjList"></ul>
+      <form class="card add" id="subjForm">
+        <h2>+ เพิ่มวิชา</h2>
+        <label for="scode">รหัสวิชา</label>
+        <input type="text" id="scode" autocomplete="off" placeholder="เช่น ค21103">
+        <label for="sname">ชื่อวิชา</label>
+        <input type="text" id="sname" autocomplete="off" placeholder="เช่น คณิตศาสตร์ 1">
+        <p class="err" id="serr" role="alert"></p>
+        <button class="btn" type="submit">เพิ่มวิชา</button>
+      </form>
+    </section>
+
+    <!-- นักเรียน -->
+    <section id="p-students" role="tabpanel" aria-labelledby="t-students" hidden>
+      <h2>รายชื่อนักเรียน</h2>
+      <p class="hint">"รหัส" คือสิ่งที่นักเรียนกรอกตอนเขียนความคิดเห็น ระบบแสดงผลเป็น "เลขที่"</p>
+      <div class="stats" id="stStats"></div>
+      <label for="sfilter" style="margin-top:12px">ค้นหา</label>
+      <input type="text" id="sfilter" autocomplete="off" placeholder="เลขที่ หรือ รหัส">
+      <ul class="list" id="stList"></ul>
+      <form class="card add" id="stForm">
+        <h2>+ เพิ่มนักเรียน</h2>
+        <label for="stBulk">วางรายชื่อได้หลายบรรทัด (บรรทัดละคน)</label>
+        <textarea id="stBulk" placeholder="12 10112&#10;13 10113&#10;หรือพิมพ์เฉพาะรหัส ระบบเรียงเลขที่ต่อให้"></textarea>
+        <p class="hint">รูปแบบ: <b>เลขที่ รหัส</b> (คั่นด้วยเว้นวรรค จุลภาค หรือแท็บ) · วางจาก Excel/Google Sheets ได้ · รหัสเป็นตัวอักษรหรือตัวเลข 3–20 ตัว</p>
+        <ul class="preview" id="stPreview"></ul>
+        <button class="btn" id="stAdd" type="submit" disabled>เพิ่มนักเรียน</button>
+      </form>
+    </section>
+
+    <!-- ตั้งค่า -->
+    <section id="p-settings" role="tabpanel" aria-labelledby="t-settings" hidden>
+      <form class="card" id="nameForm" style="margin-top:0">
+        <h2>ชื่อห้อง</h2>
+        <label for="cname" class="sr" style="margin-top:8px">ชื่อห้องที่แสดงด้านบนของหน้าหลัก</label>
+        <input type="text" id="cname" autocomplete="off">
+        <button class="btn" type="submit">บันทึกชื่อห้อง</button>
+      </form>
+
+      <form class="card" id="pinForm">
+        <h2>เปลี่ยนรหัสแอดมินห้อง</h2>
+        <p class="hint" style="margin-top:2px">รหัสปัจจุบัน: เวอร์ชัน <b id="pinVer">1</b></p>
+        <label for="npin">รหัสใหม่ (ตัวเลข 4–8 หลัก)</label>
+        <input type="password" id="npin" autocomplete="new-password" inputmode="numeric">
+        <label for="npin2">พิมพ์รหัสใหม่อีกครั้ง</label>
+        <input type="password" id="npin2" autocomplete="new-password" inputmode="numeric">
+        <div class="warn">เมื่อเปลี่ยนรหัส แอดมินคนอื่นทุกเครื่องต้องกรอกรหัสใหม่ก่อนบันทึกได้ ใช้เมื่อรหัสหลุดหรือมีแอดมินคนเก่าออกไป (เครื่องนี้ไม่ต้องกรอกใหม่)</div>
+        <p class="err" id="perr" role="alert"></p>
+        <button class="btn" type="submit">เปลี่ยนรหัส</button>
+      </form>
+
+      <div class="card">
+        <h2>ที่ซ่อนไว้ <span class="pill" id="hidCount"></span></h2>
+        <p class="hint" style="margin-top:2px">การ์ดหรือความคิดเห็นที่แอดมินซ่อน ยังไม่ถูกลบจริง กู้คืนได้</p>
+        <ul class="list" id="hidList"></ul>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+var PIN='1234';
+var $=function(id){return document.getElementById(id)};
+function esc(t){var d=document.createElement('div');d.textContent=t==null?'':String(t);return d.innerHTML}
+function load(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function save(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
+var toastTimer;
+function toast(t){var el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.hidden=true},2600)}
+
+var uid=100;
+var cls={name:'ป.5/1',pinVersion:1};
+var subjects=[
+ {id:1,code:'ค21103',name:'คณิตศาสตร์ 1',n:24,active:true},
+ {id:2,code:'อ21103',name:'ภาษาอังกฤษเข้ม',n:21,active:true},
+ {id:3,code:'อ21213',name:'เสริมทักษะการฟัง-พูดภาษาอังกฤษ 1',n:12,active:true},
+ {id:4,code:'ว21203',name:'คอมพิวเตอร์และการออกแบบเทคโนโลยี 1',n:18,active:true},
+ {id:5,code:'ก20913',name:'E-Com',n:9,active:true},
+ {id:6,code:'ส21101',name:'สังคมศึกษา (ภาคเรียนที่ผ่านมา)',n:30,active:false}
+];
+var students=[];
+for(var i=1;i<=30;i++)students.push({id:i,seat:i,code:String(10100+i),active:i!==27});
+var hidden=[
+ {id:1,type:'การ์ด',title:'อ21103 ภาษาอังกฤษเข้ม · 20/10/2026',meta:'ซ่อนโดย แม่น้องมาย (บันทึกซ้ำ)'},
+ {id:2,type:'ความคิดเห็น',title:'เลขที่ 8 ใต้การ์ด ค21103 · 22/10/2026',meta:'ซ่อนโดย ครูต้น'},
+ {id:3,type:'ความคิดเห็น',title:'เลขที่ 19 ใต้การ์ด ว21203 · 18/10/2026',meta:'ซ่อนโดย แม่น้องมาย'}
+];
+var st={admin:load('mock-admin'),tab:'subjects',editSub:null,editStu:null,filter:''};
+
+/* ---------- gate + tabs ---------- */
+function showGate(){
+  var ok=!!st.admin;
+  $('gate').hidden=ok;$('app').hidden=!ok;
+  if(ok){$('whoName').textContent=st.admin;renderAll()}
+}
+$('ggo').addEventListener('click',function(){
+  var n=$('gname').value.trim(),p=$('gpin').value.trim();
+  if(!n){$('gerr').textContent='กรุณากรอกชื่อผู้บันทึก';return}
+  if(p!==PIN){$('gerr').textContent='รหัสแอดมินห้องไม่ถูกต้อง ลองใหม่อีกครั้ง';return}
+  $('gerr').textContent='';st.admin=n;save('mock-admin',n);$('gpin').value='';showGate();toast('ยินดีต้อนรับ '+n);
+});
+$('notme').addEventListener('click',function(){st.admin=null;save('mock-admin',null);showGate();$('gname').focus()});
+$('back').addEventListener('click',function(){toast('ในระบบจริง ปุ่มนี้พากลับหน้าหลักของห้อง')});
+function setTab(t){
+  st.tab=t;
+  ['subjects','students','settings'].forEach(function(k){
+    $('t-'+k).setAttribute('aria-selected',k===t?'true':'false');
+    $('p-'+k).hidden=k!==t;
+  });
+}
+['subjects','students','settings'].forEach(function(k){$('t-'+k).addEventListener('click',function(){setTab(k)})});
+
+/* ---------- subjects ---------- */
+function renderSubjects(){
+  var html=subjects.map(function(s,i){
+    if(st.editSub===s.id){
+      return '<li class="row"><div class="editgrid" style="width:100%"><div><label for="ec" style="margin-top:0">รหัสวิชา</label><input type="text" id="ec" value="'+esc(s.code)+'" autocomplete="off"></div><div><label for="en" style="margin-top:0">ชื่อวิชา</label><input type="text" id="en" value="'+esc(s.name)+'" autocomplete="off"></div><div class="row2"><button class="btn" type="button" data-ssave="'+s.id+'">บันทึก</button><button class="btn alt" type="button" data-scancel="1">ยกเลิก</button></div></div></li>';
+    }
+    var del=s.n===0
+      ?'<button type="button" data-sdel="'+s.id+'" aria-label="ลบวิชา" title="ลบ">🗑</button>'
+      :'<button type="button" disabled aria-label="ลบไม่ได้ เพราะมีบันทึกแล้ว" title="ลบไม่ได้ เพราะมีบันทึกแล้ว ให้ซ่อนแทน">🗑</button>';
+    return '<li class="row'+(s.active?'':' off')+'"><div class="rmain"><b>'+esc(s.code)+'</b> '+esc(s.name)+(s.active?'':'<span class="pill">ซ่อนอยู่</span>')+'<small>'+s.n+' บันทึก</small></div><div class="rtools">'
+      +'<button type="button" data-sup="'+s.id+'" aria-label="เลื่อนขึ้น"'+(i===0?' disabled':'')+'>▲</button>'
+      +'<button type="button" data-sdown="'+s.id+'" aria-label="เลื่อนลง"'+(i===subjects.length-1?' disabled':'')+'>▼</button>'
+      +'<button type="button" data-sedit="'+s.id+'" aria-label="แก้ไข" title="แก้ไข">✎</button>'
+      +'<button type="button" data-stog="'+s.id+'" aria-label="'+(s.active?'ซ่อนวิชา':'แสดงวิชา')+'" title="'+(s.active?'ซ่อน':'แสดง')+'">'+(s.active?'🙈':'👁')+'</button>'
+      +del+'</div></li>';
+  }).join('');
+  $('subjList').innerHTML=html||'<li class="empty">ยังไม่มีวิชา เพิ่มวิชาแรกด้านล่าง</li>';
+}
+function subjIndex(id){for(var i=0;i<subjects.length;i++)if(subjects[i].id===id)return i;return -1}
+var delTimer;
+$('subjList').addEventListener('click',function(ev){
+  var t=ev.target,b;
+  if((b=t.closest('[data-sup]'))){var i=subjIndex(+b.getAttribute('data-sup'));if(i>0){var x=subjects[i];subjects[i]=subjects[i-1];subjects[i-1]=x;renderSubjects()}return}
+  if((b=t.closest('[data-sdown]'))){var j=subjIndex(+b.getAttribute('data-sdown'));if(j>=0&&j<subjects.length-1){var y=subjects[j];subjects[j]=subjects[j+1];subjects[j+1]=y;renderSubjects()}return}
+  if((b=t.closest('[data-sedit]'))){st.editSub=+b.getAttribute('data-sedit');renderSubjects();$('ec').focus();return}
+  if((b=t.closest('[data-scancel]'))){st.editSub=null;renderSubjects();return}
+  if((b=t.closest('[data-ssave]'))){
+    var s=subjects[subjIndex(+b.getAttribute('data-ssave'))],c=$('ec').value.trim(),n=$('en').value.trim();
+    if(!c||!n){toast('กรุณากรอกรหัสวิชาและชื่อวิชา');return}
+    if(subjects.some(function(o){return o!==s&&o.code.toLowerCase()===c.toLowerCase()})){toast('มีรหัสวิชา '+c+' อยู่แล้ว');return}
+    s.code=c;s.name=n;st.editSub=null;renderSubjects();toast('แก้ไขวิชาแล้ว');return}
+  if((b=t.closest('[data-stog]'))){var q=subjects[subjIndex(+b.getAttribute('data-stog'))];q.active=!q.active;renderSubjects();toast(q.active?'แสดงวิชาแล้ว':'ซ่อนวิชาแล้ว บันทึกเก่ายังอยู่ครบ');return}
+  if((b=t.closest('[data-sdel]'))){
+    if(b.classList.contains('sure')){subjects.splice(subjIndex(+b.getAttribute('data-sdel')),1);renderSubjects();toast('ลบวิชาแล้ว')}
+    else{b.classList.add('sure');b.textContent='ยืนยันลบ?';clearTimeout(delTimer);delTimer=setTimeout(renderSubjects,3000)}
+  }
+});
+$('subjForm').addEventListener('submit',function(ev){
+  ev.preventDefault();
+  var c=$('scode').value.trim(),n=$('sname').value.trim();
+  if(!c||!n){$('serr').textContent='กรุณากรอกรหัสวิชาและชื่อวิชา';return}
+  if(subjects.some(function(o){return o.code.toLowerCase()===c.toLowerCase()})){$('serr').textContent='มีรหัสวิชา '+c+' อยู่แล้ว';return}
+  $('serr').textContent='';subjects.push({id:++uid,code:c,name:n,n:0,active:true});
+  $('scode').value='';$('sname').value='';renderSubjects();toast('เพิ่มวิชา '+c+' แล้ว');
+});
+
+/* ---------- students ---------- */
+var CODE_RE=/^[A-Za-z0-9]{3,20}$/;
+function seatOf(code){var s=students.filter(function(x){return x.code===code})[0];return s?s.seat:null}
+function parseBulk(text,skipId){
+  var active=students.filter(function(s){return s.active&&s.id!==skipId});
+  var takenSeat={},takenCode={},maxSeat=0;
+  active.forEach(function(s){takenSeat[s.seat]=1;if(s.seat>maxSeat)maxSeat=s.seat});
+  students.forEach(function(s){if(s.id!==skipId)takenCode[s.code.toLowerCase()]=s.active?1:2});
+  var out=[];
+  text.split(/\r?\n/).forEach(function(line){
+    line=line.trim();if(!line)return;
+    var tk=line.split(/[\s,;\t]+/).filter(Boolean),seat,code,r={raw:line};
+    if(tk.length===1){code=tk[0];seat=++maxSeat;while(takenSeat[seat])seat=++maxSeat}
+    else if(tk.length===2){seat=Number(tk[0]);code=tk[1]}
+    else{r.err='รูปแบบไม่ถูก';out.push(r);return}
+    if(!(seat>=1&&seat<=99&&Math.floor(seat)===seat)){r.err='เลขที่ต้องเป็น 1–99';out.push(r);return}
+    if(!CODE_RE.test(code)){r.err='รหัสต้องเป็นตัวอักษรหรือตัวเลข 3–20 ตัว';out.push(r);return}
+    if(takenCode[code.toLowerCase()]){r.err=takenCode[code.toLowerCase()]===2?'รหัสนี้มีอยู่แล้ว (ซ่อนอยู่) กดแสดงที่รายชื่อแทน':'รหัสซ้ำกับที่มีอยู่';out.push(r);return}
+    if(takenSeat[seat]){r.err='เลขที่ '+seat+' ถูกใช้แล้ว';out.push(r);return}
+    takenSeat[seat]=1;takenCode[code.toLowerCase()]=1;r.seat=seat;r.code=code;out.push(r);
+  });
+  return out;
+}
+function renderStudents(){
+  var act=students.filter(function(s){return s.active}).length;
+  $('stStats').innerHTML='<span>ทั้งหมด <b>'+students.length+'</b> คน</span><span>ใช้งาน <b>'+act+'</b></span><span>ซ่อน <b>'+(students.length-act)+'</b></span>';
+  var f=st.filter.trim().toLowerCase();
+  var list=students.slice().sort(function(a,b){return a.seat-b.seat}).filter(function(s){return !f||String(s.seat)===f||s.code.toLowerCase().indexOf(f)>=0});
+  $('stList').innerHTML=list.length?list.map(function(s){
+    if(st.editStu===s.id){
+      return '<li class="row"><div class="editgrid" style="width:100%"><div><label for="es" style="margin-top:0">เลขที่</label><input type="text" id="es" inputmode="numeric" value="'+s.seat+'" autocomplete="off"></div><div><label for="ek" style="margin-top:0">รหัส</label><input type="text" id="ek" value="'+esc(s.code)+'" autocomplete="off"></div><div class="row2"><button class="btn" type="button" data-usave="'+s.id+'">บันทึก</button><button class="btn alt" type="button" data-ucancel="1">ยกเลิก</button></div></div></li>';
+    }
+    return '<li class="row'+(s.active?'':' off')+'"><div class="rmain"><span class="seat">'+s.seat+'</span>รหัส <b>'+esc(s.code)+'</b>'+(s.active?'':'<span class="pill">ซ่อนอยู่</span>')+'</div><div class="rtools"><button type="button" data-uedit="'+s.id+'" aria-label="แก้ไข" title="แก้ไข">✎</button><button type="button" data-utog="'+s.id+'" aria-label="'+(s.active?'ซ่อน':'แสดง')+'" title="'+(s.active?'ซ่อน (ย้ายออก)':'แสดงอีกครั้ง')+'">'+(s.active?'🙈':'👁')+'</button></div></li>';
+  }).join(''):'<li class="empty">ไม่พบ "'+esc(st.filter)+'"</li>';
+}
+$('sfilter').addEventListener('input',function(){st.filter=$('sfilter').value;renderStudents()});
+$('stList').addEventListener('click',function(ev){
+  var t=ev.target,b;
+  if((b=t.closest('[data-uedit]'))){st.editStu=+b.getAttribute('data-uedit');renderStudents();$('es').focus();return}
+  if((b=t.closest('[data-ucancel]'))){st.editStu=null;renderStudents();return}
+  if((b=t.closest('[data-utog]'))){
+    var s=students.filter(function(x){return x.id===+b.getAttribute('data-utog')})[0];
+    if(!s.active){var chk=parseBulk(s.seat+' '+s.code,s.id)[0];if(chk.err){toast('แสดงไม่ได้: '+chk.err);return}}
+    s.active=!s.active;renderStudents();toast(s.active?'แสดงเลขที่ '+s.seat+' แล้ว':'ซ่อนเลขที่ '+s.seat+' แล้ว รหัสนี้โพสต์ไม่ได้อีก ความคิดเห็นเก่ายังอยู่');return}
+  if((b=t.closest('[data-usave]'))){
+    var u=students.filter(function(x){return x.id===+b.getAttribute('data-usave')})[0];
+    var r=parseBulk($('es').value.trim()+' '+$('ek').value.trim(),u.active?u.id:u.id)[0];
+    if(r.err){toast(r.err);return}
+    u.seat=r.seat;u.code=r.code;st.editStu=null;renderStudents();toast('แก้ไขแล้ว · ความคิดเห็นเก่าของรหัสนี้จะแสดงเป็นเลขที่ '+u.seat);return}
+});
+$('stBulk').addEventListener('input',function(){
+  var res=parseBulk($('stBulk').value),ok=res.filter(function(r){return !r.err}).length;
+  $('stPreview').innerHTML=res.map(function(r){return r.err
+    ?'<li><span class="bad">✗</span><span>'+esc(r.raw)+' — '+esc(r.err)+'</span></li>'
+    :'<li><span class="ok">✓</span><span>เลขที่ <b>'+r.seat+'</b> · รหัส <b>'+esc(r.code)+'</b></span></li>'}).join('');
+  $('stAdd').disabled=ok===0;$('stAdd').textContent=ok?'เพิ่มนักเรียน '+ok+' คน':'เพิ่มนักเรียน';
+});
+$('stForm').addEventListener('submit',function(ev){
+  ev.preventDefault();
+  var res=parseBulk($('stBulk').value),good=res.filter(function(r){return !r.err}),bad=res.length-good.length;
+  if(!good.length)return;
+  good.forEach(function(r){students.push({id:++uid,seat:r.seat,code:r.code,active:true})});
+  $('stBulk').value='';$('stPreview').innerHTML='';$('stAdd').disabled=true;$('stAdd').textContent='เพิ่มนักเรียน';
+  renderStudents();toast('เพิ่ม '+good.length+' คน'+(bad?' · ข้าม '+bad+' บรรทัดที่ไม่ถูกต้อง':''));
+});
+
+/* ---------- settings ---------- */
+function renderTitle(){$('title').textContent='จัดการห้อง '+cls.name;$('cname').value=cls.name;$('pinVer').textContent=cls.pinVersion}
+$('nameForm').addEventListener('submit',function(ev){
+  ev.preventDefault();var n=$('cname').value.trim();
+  if(!n){toast('กรุณากรอกชื่อห้อง');return}
+  cls.name=n;renderTitle();toast('บันทึกชื่อห้องแล้ว');
+});
+$('pinForm').addEventListener('submit',function(ev){
+  ev.preventDefault();var a=$('npin').value.trim(),b=$('npin2').value.trim();
+  if(!/^\d{4,8}$/.test(a)){$('perr').textContent='รหัสต้องเป็นตัวเลข 4–8 หลัก';return}
+  if(a!==b){$('perr').textContent='รหัสสองช่องไม่ตรงกัน';return}
+  $('perr').textContent='';PIN=a;cls.pinVersion++;$('npin').value='';$('npin2').value='';
+  renderTitle();toast('เปลี่ยนรหัสแล้ว · แอดมินเครื่องอื่นต้องกรอกรหัสใหม่');
+});
+function renderHidden(){
+  $('hidCount').textContent=hidden.length;
+  $('hidList').innerHTML=hidden.length?hidden.map(function(h){
+    return '<li class="row"><div class="rmain"><span class="pill" style="margin:0 6px 0 0">'+esc(h.type)+'</span>'+esc(h.title)+'<small>'+esc(h.meta)+'</small></div><div class="rtools"><button type="button" data-restore="'+h.id+'" style="font-size:14px;font-weight:700">กู้คืน</button></div></li>';
+  }).join(''):'<li class="empty">ไม่มีรายการที่ซ่อนไว้</li>';
+}
+$('hidList').addEventListener('click',function(ev){
+  var b=ev.target.closest('[data-restore]');if(!b)return;
+  var id=+b.getAttribute('data-restore');hidden=hidden.filter(function(h){return h.id!==id});renderHidden();toast('กู้คืนแล้ว');
+});
+
+function renderAll(){renderTitle();renderSubjects();renderStudents();renderHidden()}
+showGate();
+})();
+</script>
+
+</html>
