@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>จัดการระบบห้องเรียน</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600&family=Sarabun:wght@400;500;700&display=swap">
+<style>
+/* Layout: mobile-first single column. Overview numbers, then one card per room, then create form and system info. Same brown-yellow-cream identity as the other pages. */
+:root{
+  --bg:#f5efe3; --surface:#ffffff; --ink:#43291a; --muted:#85705c; --line:#e6dccb;
+  --accent:#ffcc0a; --accent-ink:#43291a; --hw-bg:#fff7d6; --hw-line:#f1c40f;
+  --good:#2f8a3e; --danger:#b83a2a; --panel:#efe7da; --focus:#1b6fd8;
+  --font-display:'Prompt','Sarabun',system-ui,sans-serif;
+  --font-body:'Sarabun','Noto Sans Thai',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1b140e; --surface:#2a2017; --ink:#f4e9d7; --muted:#b9a68e; --line:#43362a;
+  --accent:#ffcc0a; --accent-ink:#2a1a0c; --hw-bg:#3a3010; --hw-line:#c9a008;
+  --good:#6fcb7e; --danger:#ff8d7a; --panel:#33281d; --focus:#7db4ff; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1b140e; --surface:#2a2017; --ink:#f4e9d7; --muted:#b9a68e; --line:#43362a;
+  --accent:#ffcc0a; --accent-ink:#2a1a0c; --hw-bg:#3a3010; --hw-line:#c9a008;
+  --good:#6fcb7e; --danger:#ff8d7a; --panel:#33281d; --focus:#7db4ff; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.55;
+  padding-block:20px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:820px;margin:0 auto;background:var(--surface);border-radius:20px;border-top:12px solid var(--ink);padding:22px 16px 30px;box-shadow:0 8px 30px rgba(67,41,26,.10)}
+h1{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,4.6vw,30px);text-align:center;margin:6px 0 4px;text-wrap:balance}
+h2{font-family:var(--font-display);font-weight:600;font-size:19px;margin:0 0 4px}
+h3{font-family:var(--font-display);font-weight:600;font-size:18px;margin:0;overflow-wrap:anywhere}
+.sub{text-align:center;color:var(--muted);font-size:14px;margin:0 0 12px}
+.mock{display:block;width:fit-content;margin:0 auto 10px;font-size:12px;padding:3px 12px;border-radius:99px;border:1px dashed var(--muted);color:var(--muted)}
+.rule{height:3px;background:var(--accent);border:0;margin:10px 0 16px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+label{display:block;font-weight:700;margin:14px 0 5px}
+input[type=text],input[type=date]{width:100%;min-height:46px;font-size:16px;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+.btn{border:0;border-radius:10px;padding:12px 16px;background:var(--ink);color:var(--accent);font-weight:700;cursor:pointer;width:100%;margin-top:14px;font-size:17px;min-height:48px}
+.btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--ink);width:auto;margin:0}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.sbtn{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 14px;cursor:pointer;font-size:15px;font-weight:700;flex:1 1 auto}
+.sbtn.sure{background:var(--danger);color:#fff;border-color:var(--danger)}
+.sbtn:disabled{opacity:.35;cursor:not-allowed}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+.err{color:var(--danger);font-size:14px;margin:8px 0 0;min-height:1.2em}
+.me{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;font-size:14px;color:var(--muted);background:var(--panel);border-radius:12px;padding:8px 12px}
+.me b{color:var(--ink);overflow-wrap:anywhere}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 0}
+.stat{background:var(--panel);border-radius:12px;padding:10px 6px;text-align:center}
+.stat b{display:block;font-family:var(--font-display);font-size:clamp(17px,5vw,22px);line-height:1.2;white-space:nowrap}
+.stat span{font-size:12px;color:var(--muted)}
+.bar{height:10px;border-radius:99px;background:var(--panel);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--accent);border-right:2px solid var(--ink)}
+
+.sec{margin-top:26px}
+.list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:12px}
+.room{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--ink);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.room.off{opacity:.72;border-left-color:var(--muted)}
+.room.fresh{border-color:var(--hw-line);background:var(--hw-bg)}
+.top{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.pill{display:inline-block;font-size:12px;border-radius:99px;padding:0 10px;background:var(--panel);color:var(--muted);font-weight:700}
+.pill.on{background:var(--good);color:#fff}
+.url{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.meta{font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px}
+.meta b{color:var(--ink)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.pinbox{background:var(--panel);border-radius:10px;padding:12px}
+.pinbox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pinval{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:28px;font-weight:700;letter-spacing:.2em;padding:4px 10px;background:var(--surface);border:1.5px dashed var(--ink);border-radius:10px;user-select:all}
+.warn{background:var(--hw-bg);border:1px solid var(--hw-line);border-radius:10px;padding:10px 12px;font-size:14px;margin-top:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+.card.add{background:var(--hw-bg);border:1.5px dashed var(--hw-line)}
+.grid2{display:grid;grid-template-columns:1fr;gap:0 12px}
+.pinrow{display:flex;gap:8px;align-items:stretch}
+.pinrow input{flex:1;min-width:0}
+.pinrow .sbtn{flex:none}
+.urlprev{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;color:var(--muted);margin:6px 0 0;overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{background:var(--panel);border-radius:99px;padding:3px 12px;font-size:14px;overflow-wrap:anywhere}
+.empty{border:1.5px dashed var(--line);border-radius:12px;padding:18px 12px;text-align:center;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:11px 20px;border-radius:99px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:20;max-width:calc(100% - 32px)}
+@media (min-width:561px){
+  .wrap{padding:30px 36px 36px}
+  .grid2{grid-template-columns:1fr 1fr}
+  .btn{width:auto;padding-inline:28px}
+  .sbtn{flex:none}
+}
+</style>
+
+<div class="wrap">
+  <span class="mock">ตัวอย่างหน้าตา · ข้อมูลสมมติ</span>
+  <h1>จัดการระบบ</h1>
+  <p class="sub">สำหรับผู้ดูแลระบบ (super admin) เท่านั้น</p>
+  <div class="me">🔐 เข้าสู่ระบบด้วย Cloudflare Access: <b>you@example.com</b></div>
+  <p class="hint" style="text-align:center">ในระบบจริงหน้านี้อยู่หลัง Cloudflare Access ไม่มีหน้าล็อกอินของเว็บเอง อีเมลที่ไม่อยู่ในรายชื่อผู้ดูแลระบบจะเข้าไม่ได้</p>
+
+  <div class="stats">
+    <div class="stat"><b id="sAll">0</b><span>ห้องทั้งหมด</span></div>
+    <div class="stat"><b id="sOn">0</b><span>เปิดใช้งาน</span></div>
+    <div class="stat"><b id="sStore">0.4 GB</b><span>พื้นที่รูป</span></div>
+  </div>
+  <div class="bar" role="img" aria-label="พื้นที่เก็บรูปที่ใช้ไปแล้ว 4 เปอร์เซ็นต์"><i style="width:4%"></i></div>
+  <p class="hint">ใช้ไป 0.4 จาก 10 GB ของพื้นที่ฟรี (ประมาณการ) ใกล้เต็มเมื่อไรจะเตือนที่นี่</p>
+
+  <section class="sec">
+    <h2>ห้องเรียน</h2>
+    <ul class="list" id="rooms"></ul>
+  </section>
+
+  <section class="sec">
+    <form class="card add" id="newForm">
+      <h2>+ สร้างห้องใหม่</h2>
+      <label for="nslug" style="margin-top:8px">ชื่อลิงก์ของห้อง (ตั้งแล้วเปลี่ยนไม่ได้)</label>
+      <input type="text" id="nslug" autocomplete="off" placeholder="เช่น p5-1" autocapitalize="none" spellcheck="false">
+      <p class="urlprev" id="nprev">/c/…</p>
+      <p class="hint">ตัวอักษรอังกฤษพิมพ์เล็ก ตัวเลข และขีด 3–30 ตัว ใช้เป็นลิงก์ถาวร ชื่อห้องที่แสดงตั้งในภาคเรียน เปลี่ยนตามปีได้</p>
+
+      <label for="nlabel">ชื่อห้องที่แสดง</label>
+      <input type="text" id="nlabel" autocomplete="off" placeholder="เช่น ป.5/1">
+      <label for="nterm">ภาคเรียนแรก</label>
+      <input type="text" id="nterm" autocomplete="off" placeholder="เช่น ภาคเรียนที่ 1/2027">
+      <div class="grid2">
+        <div><label for="nst">วันเปิดเทอม</label><input type="date" id="nst"></div>
+        <div><label for="nen">วันปิดเทอม</label><input type="date" id="nen"></div>
+      </div>
+      <label for="npin">รหัสแอดมินห้องเริ่มต้น (ตัวเลข 4–8 หลัก)</label>
+      <div class="pinrow"><input type="text" id="npin" inputmode="numeric" autocomplete="off"><button class="sbtn" id="nrand" type="button">🎲 สุ่ม</button></div>
+      <p class="hint">รหัสนี้แจ้งให้แอดมินห้อง ระบบเก็บเฉพาะค่าที่เข้ารหัสแล้ว หลังสร้างจะแสดงให้ดูครั้งเดียว</p>
+      <p class="err" id="nerr" role="alert"></p>
+      <button class="btn" type="submit">สร้างห้อง</button>
+    </form>
+  </section>
+
+  <section class="sec">
+    <h2>ระบบ</h2>
+    <div class="card" style="margin-top:8px">
+      <b>ผู้ดูแลระบบ (Super admin)</b>
+      <div class="chips"><span class="chip">you@example.com</span><span class="chip">backup@example.com</span></div>
+      <p class="hint">เพิ่มหรือลบที่การตั้งค่าของ Cloudflare (ตัวแปร SUPER_ADMINS และกฎของ Access) ไม่แก้ในหน้านี้ เพื่อกันล็อกตัวเองออกจากระบบ</p>
+    </div>
+    <div class="card">
+      <b>สำรองข้อมูล</b>
+      <p class="meta" style="margin:4px 0 0">ล่าสุด: <b id="bk">วันนี้ 03:00 (อัตโนมัติ)</b></p>
+      <div class="tools"><button class="sbtn" id="bkNow" type="button">สำรองตอนนี้</button></div>
+      <p class="hint">แนะนำให้สำรองก่อนสิ้นภาคเรียนทุกครั้ง</p>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+var $=function(id){return document.getElementById(id)};
+function esc(t){var d=document.createElement('div');d.textContent=t==null?'':String(t);return d.innerHTML}
+function pad(n){return String(n).padStart(2,'0')}
+function iso(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function addDays(s,n){var p=s.split('-').map(Number),d=new Date(p[0],p[1]-1,p[2]);d.setDate(d.getDate()+n);return iso(d)}
+var TODAY=iso(new Date());
+var toastTimer;
+function toast(t){var el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.hidden=true},2800)}
+function genPin(){var a=new Uint32Array(1);(window.crypto||{getRandomValues:function(x){x[0]=Math.floor(Math.random()*4294967295)}}).getRandomValues(a);return String(100000+a[0]%900000)}
+
+var Y=new Date().getFullYear();
+var uid=10;
+var rooms=[
+ {id:1,slug:'p5-1',label:'ป.5/1',term:'ภาคเรียนที่ 2/'+Y,students:29,entries:312,pinV:3,active:true},
+ {id:2,slug:'p5-2',label:'ป.5/2',term:'ภาคเรียนที่ 2/'+Y,students:31,entries:268,pinV:1,active:true},
+ {id:3,slug:'m1-3',label:'ม.1/3 (ปีที่แล้ว)',term:'ภาคเรียนที่ 2/'+(Y-1),students:34,entries:540,pinV:2,active:false}
+];
+var ui={pin:null,reveal:{},fresh:null};
+
+function render(){
+  $('sAll').textContent=rooms.length;
+  $('sOn').textContent=rooms.filter(function(r){return r.active}).length;
+  $('rooms').innerHTML=rooms.length?rooms.map(function(r){
+    var empty=r.entries===0;
+    var pinPanel='';
+    if(ui.reveal[r.id]){
+      pinPanel='<div class="pinbox"><div>รหัสแอดมินห้องใหม่ <small class="hint">(แสดงครั้งเดียว)</small></div><div class="row" style="margin-top:6px"><span class="pinval">'+esc(ui.reveal[r.id])+'</span><button class="sbtn" type="button" data-copy="'+r.id+'">คัดลอก</button><button class="sbtn" type="button" data-hide="'+r.id+'">เสร็จแล้ว</button></div><p class="hint">จดหรือส่งให้แอดมินห้องก่อนกด "เสร็จแล้ว" ปิดแล้วดูซ้ำไม่ได้ (ลืมให้ตั้งรหัสใหม่) แอดมินที่ใช้รหัสเก่าต้องกรอกรหัสใหม่</p></div>';
+    }else if(ui.pin===r.id){
+      pinPanel='<div class="pinbox"><label for="pp-'+r.id+'" style="margin-top:0">รหัสใหม่ (ตัวเลข 4–8 หลัก)</label><div class="pinrow"><input type="text" id="pp-'+r.id+'" inputmode="numeric" autocomplete="off" value="'+genPin()+'"><button class="sbtn" type="button" data-rand="'+r.id+'">🎲 สุ่ม</button></div><p class="err" id="pe-'+r.id+'" role="alert"></p><div class="tools"><button class="sbtn" type="button" data-pinsave="'+r.id+'" style="background:var(--ink);color:var(--accent)">ตั้งรหัสใหม่</button><button class="sbtn" type="button" data-pincancel="1">ยกเลิก</button></div></div>';
+    }
+    return '<li class="room'+(r.active?'':' off')+(ui.fresh===r.id?' fresh':'')+'">'
+      +'<div class="top"><h3>'+esc(r.label)+'</h3><span class="pill'+(r.active?' on':'')+'">'+(r.active?'เปิดใช้งาน':'ปิดอยู่ (อ่านอย่างเดียว)')+'</span></div>'
+      +'<div class="url">/c/'+esc(r.slug)+'</div>'
+      +'<div class="meta"><span>'+esc(r.term)+'</span><span>นักเรียน <b>'+r.students+'</b></span><span>บันทึก <b>'+r.entries+'</b></span><span>รหัสแอดมิน เวอร์ชัน <b>'+r.pinV+'</b></span></div>'
+      +pinPanel
+      +'<div class="tools"><button class="sbtn" type="button" data-open="'+r.id+'">จัดการห้อง →</button><button class="sbtn" type="button" data-link="'+r.id+'">คัดลอกลิงก์</button><button class="sbtn" type="button" data-pin="'+r.id+'">ตั้งรหัสแอดมินใหม่</button><button class="sbtn" type="button" data-active="'+r.id+'">'+(r.active?'ปิดห้อง':'เปิดห้องอีกครั้ง')+'</button>'
+      +(empty?'<button class="sbtn" type="button" data-del="'+r.id+'" aria-label="ลบห้อง">🗑 ลบ</button>':'<button class="sbtn" type="button" disabled title="ลบไม่ได้ เพราะมีข้อมูลแล้ว ให้ปิดห้องแทน" aria-label="ลบไม่ได้ เพราะมีข้อมูลแล้ว">🗑</button>')
+      +'</div></li>';
+  }).join(''):'<li class="empty">ยังไม่มีห้อง สร้างห้องแรกด้านล่าง</li>';
+}
+function find(id){return rooms.filter(function(r){return r.id===id})[0]}
+var delTimer;
+$('rooms').addEventListener('click',function(ev){
+  var t=ev.target,b,r;
+  if((b=t.closest('[data-open]'))){toast('ในระบบจริง เข้าหน้าจัดการของห้อง '+find(+b.getAttribute('data-open')).label+' ได้เลยโดยไม่ต้องกรอกรหัสแอดมิน');return}
+  if((b=t.closest('[data-link]'))){
+    r=find(+b.getAttribute('data-link'));
+    try{navigator.clipboard.writeText('/c/'+r.slug).then(function(){toast('คัดลอกลิงก์ /c/'+r.slug+' แล้ว')},function(){toast('คัดลอกไม่ได้ ให้จดลิงก์ /c/'+r.slug)})}catch(e){toast('คัดลอกไม่ได้ ให้จดลิงก์ /c/'+r.slug)}
+    return}
+  if((b=t.closest('[data-pin]'))){ui.pin=+b.getAttribute('data-pin');render();return}
+  if((b=t.closest('[data-pincancel]'))){ui.pin=null;render();return}
+  if((b=t.closest('[data-rand]'))){$('pp-'+b.getAttribute('data-rand')).value=genPin();return}
+  if((b=t.closest('[data-pinsave]'))){
+    var id=+b.getAttribute('data-pinsave'),v=$('pp-'+id).value.trim();
+    if(!/^\d{4,8}$/.test(v)){$('pe-'+id).textContent='รหัสต้องเป็นตัวเลข 4–8 หลัก';return}
+    r=find(id);r.pinV++;ui.pin=null;ui.reveal[id]=v;render();toast('ตั้งรหัสแอดมินใหม่ให้ '+r.label+' แล้ว');return}
+  if((b=t.closest('[data-copy]'))){
+    var pv=ui.reveal[+b.getAttribute('data-copy')];
+    try{navigator.clipboard.writeText(pv).then(function(){toast('คัดลอกรหัสแล้ว')},function(){toast('คัดลอกไม่ได้ ให้จดรหัส '+pv)})}catch(e){toast('คัดลอกไม่ได้ ให้จดรหัส '+pv)}
+    return}
+  if((b=t.closest('[data-hide]'))){delete ui.reveal[+b.getAttribute('data-hide')];ui.fresh=null;render();return}
+  if((b=t.closest('[data-active]'))){r=find(+b.getAttribute('data-active'));r.active=!r.active;render();toast(r.active?'เปิดห้อง '+r.label+' แล้ว':'ปิดห้อง '+r.label+' แล้ว ทุกคนอ่านได้ แต่โพสต์หรือแก้ไขไม่ได้');return}
+  if((b=t.closest('[data-del]'))){
+    if(b.classList.contains('sure')){var id2=+b.getAttribute('data-del');rooms=rooms.filter(function(x){return x.id!==id2});render();toast('ลบห้องแล้ว')}
+    else{b.classList.add('sure');b.textContent='ยืนยันลบห้อง?';clearTimeout(delTimer);delTimer=setTimeout(render,3000)}
+  }
+});
+
+/* ---------- create room ---------- */
+function prefill(){
+  if(!$('nst').value)$('nst').value=TODAY;
+  if(!$('nen').value)$('nen').value=addDays($('nst').value,120);
+  if(!$('npin').value)$('npin').value=genPin();
+}
+$('nslug').addEventListener('input',function(){var v=$('nslug').value.trim().toLowerCase();$('nprev').textContent='/c/'+(v||'…')});
+$('nrand').addEventListener('click',function(){$('npin').value=genPin()});
+$('newForm').addEventListener('submit',function(ev){
+  ev.preventDefault();
+  var slug=$('nslug').value.trim().toLowerCase(),label=$('nlabel').value.trim(),term=$('nterm').value.trim(),st=$('nst').value,en=$('nen').value,pin=$('npin').value.trim();
+  var e='';
+  if(!/^[a-z0-9](?:[a-z0-9-]{1,28})[a-z0-9]$/.test(slug))e='ชื่อลิงก์ใช้ได้เฉพาะตัวอักษรอังกฤษพิมพ์เล็ก ตัวเลข และขีด 3–30 ตัว (ไม่ขึ้นต้นหรือลงท้ายด้วยขีด)';
+  else if(rooms.some(function(r){return r.slug===slug}))e='ชื่อลิงก์ /c/'+slug+' ถูกใช้แล้ว';
+  else if(!label||!term)e='กรุณากรอกชื่อห้องและชื่อภาคเรียนแรก';
+  else if(!st||!en||en<st)e='กรุณาเลือกวันเปิด–ปิดเทอมให้ถูกต้อง (วันปิดไม่ก่อนวันเปิด)';
+  else if(!/^\d{4,8}$/.test(pin))e='รหัสแอดมินห้องต้องเป็นตัวเลข 4–8 หลัก';
+  $('nerr').textContent=e;if(e)return;
+  var id=++uid;rooms.unshift({id:id,slug:slug,label:label,term:term,students:0,entries:0,pinV:1,active:true});
+  ui.reveal[id]=pin;ui.fresh=id;
+  $('nslug').value='';$('nlabel').value='';$('nterm').value='';$('nst').value='';$('nen').value='';$('npin').value='';$('nprev').textContent='/c/…';
+  prefill();render();toast('สร้างห้อง '+label+' แล้ว · จดรหัสแอดมินก่อนกด "เสร็จแล้ว"');
+  $('rooms').scrollIntoView({behavior:'smooth',block:'start'});
+});
+$('bkNow').addEventListener('click',function(){var n=new Date();$('bk').textContent='วันนี้ '+pad(n.getHours())+':'+pad(n.getMinutes())+' (สั่งเอง)';toast('สำรองข้อมูลเรียบร้อย (ตัวอย่าง)')});
+prefill();render();
+})();
+</script>
+
+</html>
