@@ -48,13 +48,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .panel{background:var(--panel);border:2px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:20px clamp(14px,3vw,28px) 24px;margin-bottom:6px}
 .panel h3{font-family:var(--font-display);margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ink);font-size:19px}
 label{display:block;font-weight:700;margin:14px 0 5px}
-input[type=text],input[type=date],input[type=password],select,textarea{width:100%;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+input[type=text],input[type=date],input[type=password],select,textarea{width:100%;min-height:46px;font-size:16px;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
 textarea{min-height:88px;resize:vertical}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row{display:grid;grid-template-columns:1fr;gap:0 12px}
 .row>*{min-width:0}
 .btn{border:0;border-radius:10px;padding:13px 16px;background:var(--ink);color:var(--accent);font-weight:700;cursor:pointer;width:100%;margin-top:18px;font-size:17px}
 .btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--ink);width:auto;margin:0;padding:8px 14px;font-size:15px}
-.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0;font-size:14px}
+.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0 6px;min-height:44px;font-size:14px}
 .who{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;font-size:14px;color:var(--muted);margin-bottom:2px}
 .note-edit{background:var(--hw-bg);border:1px solid var(--hw-line);border-radius:10px;padding:8px 12px;font-size:14px;margin-top:12px}
 .hint{font-size:13px;color:var(--muted);margin:6px 0 0}
@@ -65,15 +65,15 @@ textarea{min-height:88px;resize:vertical}
 .thumb small{display:block;color:var(--muted)}
 
 /* date bar */
-.datebar{margin:18px 0 0;border:1.5px dashed var(--hw-line);background:var(--hw-bg);border-radius:12px;padding:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}
-.datebar input{width:auto}
-.datebar .btn{margin:0;width:auto;padding:9px 14px;font-size:15px}
+.datebar{margin:18px 0 0;border:1.5px dashed var(--hw-line);background:var(--hw-bg);border-radius:12px;padding:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:center}
+.datebar label,.datebar input{grid-column:1/-1}
+.datebar .btn{margin:0;width:100%;min-height:46px;padding:9px 6px;font-size:15px}
 
 /* cards */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px}
 .card{position:relative;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--ink);border-radius:12px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
 .card.hw{background:var(--hw-bg);border:2px solid var(--hw-line);border-left-width:6px}
-.card h3{font-family:var(--font-display);font-weight:600;font-size:18px;margin:0;padding-right:70px;overflow-wrap:anywhere}
+.card h3{font-family:var(--font-display);font-weight:600;font-size:18px;margin:0;overflow-wrap:anywhere}
 .card p{margin:0;overflow-wrap:anywhere}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{display:inline-block;border-radius:8px;padding:2px 10px;font-weight:700;font-size:14px;background:var(--chip-bg);color:var(--chip-ink)}
@@ -81,16 +81,17 @@ textarea{min-height:88px;resize:vertical}
 .chip.late{background:var(--danger);color:#fff}
 .nohw{margin-top:auto;color:var(--good);font-weight:700}
 .byline{font-size:12px;color:var(--muted)}
-.tools{position:absolute;top:10px;right:10px;display:flex;gap:6px}
-.tools button{background:var(--surface);border:1px solid var(--line);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:15px}
-.tools button.sure{width:auto;padding:0 10px;background:var(--danger);color:#fff;border-color:var(--danger);font-size:13px;font-weight:700}
+.meta{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.tools{display:flex;gap:8px}
+.tools button{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:44px;height:44px;cursor:pointer;font-size:17px}
+.tools button.sure{padding:0 12px;background:var(--danger);color:#fff;border-color:var(--danger);font-size:13px;font-weight:700}
 .pics{display:flex;gap:6px;flex-wrap:wrap}
 .pics img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
 .empty{border:1.5px dashed var(--line);border-radius:12px;padding:26px 14px;text-align:center;color:var(--muted)}
 
 /* upcoming + overdue */
 .list{display:flex;flex-direction:column;gap:10px}
-.item{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--hw-line);border-radius:10px;padding:12px 14px}
+.item{display:flex;flex-direction:column;gap:8px;align-items:flex-start;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--hw-line);border-radius:10px;padding:12px 14px}
 .item>div{min-width:0}
 .item b{overflow-wrap:anywhere}
 .item p{margin:2px 0 0;overflow-wrap:anywhere}
@@ -107,7 +108,7 @@ details.over[open]>summary::after{content:"▾ ย่อ"}
 
 /* photos + comments inside cards */
 .pics img{width:88px;height:88px;cursor:zoom-in}
-.cbtn{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:0;border-top:1px dashed var(--line);margin-top:4px;padding:10px 2px 2px;cursor:pointer;font-weight:700;text-align:left}
+.cbtn{display:flex;align-items:center;gap:8px;width:100%;min-height:48px;background:transparent;border:0;border-top:1px dashed var(--line);margin-top:4px;padding:8px 2px;cursor:pointer;font-weight:700;text-align:left}
 .cbtn span{font-weight:500;color:var(--muted)}
 .cbtn i{margin-left:auto;font-style:normal;color:var(--muted)}
 .cmts{display:flex;flex-direction:column;gap:10px;padding-top:6px}
@@ -120,8 +121,9 @@ details.over[open]>summary::after{content:"▾ ย่อ"}
 .cform{background:var(--panel);border-radius:10px;padding:4px 12px 12px}
 .cform label{margin:10px 0 4px;font-size:14px}
 .cform textarea{min-height:64px}
-.cform .btn{margin-top:12px;font-size:16px;padding:10px 14px}
-.cform input[type=file]{font-size:13px}
+.cform .btn{margin-top:12px;font-size:16px;padding:12px 14px;min-height:48px}
+.cwho{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:14px}
+input[type=file]{width:100%;max-width:100%;min-width:0;font-size:14px}
 .lnk{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:1px 10px;margin:1px 2px;border-radius:99px;background:var(--surface);border:1.5px solid var(--ink);color:var(--ink);font-weight:700;font-size:14px;text-decoration:none;vertical-align:baseline;overflow-wrap:anywhere}
 .lnk:hover{background:var(--accent);color:var(--accent-ink);border-color:var(--accent-ink)}
 .lnk b{font-weight:700}
@@ -130,7 +132,7 @@ details.over[open]>summary::after{content:"▾ ย่อ"}
 .lb img{max-width:92vw;max-height:88vh;border-radius:10px;background:#fff}
 .foot{margin-top:28px;font-size:13px;color:var(--muted);text-align:center}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:11px 20px;border-radius:99px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:20;max-width:calc(100% - 32px)}
-@media (max-width:560px){.row{grid-template-columns:1fr}.item{flex-direction:column}}
+@media (min-width:561px){.row{grid-template-columns:1fr 1fr}.item{flex-direction:row}.datebar{display:flex;flex-wrap:wrap;justify-content:center}.datebar input,.datebar .btn{width:auto}.wrap{padding-top:32px}}
 @media (prefers-reduced-motion:no-preference){.card,.item{transition:transform .15s}.card:hover{transform:translateY(-2px)}}
 </style>
 
@@ -308,9 +310,13 @@ function picsHtml(list){return list.length?'<div class="pics">'+list.map(functio
 function cthumbs(id){
   return (state.cpend[id]||[]).map(function(p,i){return '<div class="thumb"><img src="'+p.url+'" alt=""><span>ย่อแล้ว<small>'+kb(p.before)+' → '+kb(p.after)+'</small></span><button type="button" class="linkbtn" data-crm="'+id+':'+i+'" aria-label="เอารูปออก">✕</button></div>'}).join('');
 }
+function codeField(id){
+  if(state.student)return '<div class="cwho"><span>โพสต์ในนาม <b>เลขที่ '+Number(state.student.slice(3))+'</b></span><button class="linkbtn" type="button" data-cforget="1">ไม่ใช่ฉัน?</button></div>';
+  return '<label for="cc-'+id+'">รหัส</label><input type="password" id="cc-'+id+'" class="ccode" inputmode="numeric" autocomplete="off" placeholder="รหัสของคุณ"><p class="hint">ตัวอย่างนี้ใช้รหัส 10112 · กรอกครั้งเดียว ระบบจำเครื่องนี้ไว้</p>';
+}
 function commentsHtml(e){
   var list=e.comments.length?e.comments.map(function(c){return '<div class="cm"><header><b>เลขที่ '+c.seat+'</b> · '+esc(c.time)+'</header>'+(c.text?'<p>'+linkify(c.text)+'</p>':'')+picsHtml(c.photos)+'</div>'}).join(''):'<div class="empty" style="padding:14px">ยังไม่มีความคิดเห็น เป็นคนแรกได้เลย</div>';
-  return '<div class="cmts">'+list+'<form class="cform" data-id="'+e.id+'"><label for="cc-'+e.id+'">รหัสนักเรียน</label><input type="text" id="cc-'+e.id+'" class="ccode" inputmode="numeric" autocomplete="off" placeholder="เช่น 10112" value="'+esc(state.student||'')+'"><label for="ct-'+e.id+'">ความคิดเห็น</label><textarea id="ct-'+e.id+'" class="ctext" placeholder="ถามเพื่อน ตอบเพื่อน หรือวางลิงก์ (Classroom / Canva / YouTube)"></textarea><label for="cf-'+e.id+'">แนบรูป (ไม่เกิน 2 รูป)</label><input type="file" id="cf-'+e.id+'" class="cfile" accept="image/*" multiple><div class="thumbs cthumbs">'+cthumbs(e.id)+'</div><p class="err cerr" role="alert"></p><button class="btn" type="submit">โพสต์ความคิดเห็น</button></form></div>';
+  return '<div class="cmts">'+list+'<form class="cform" data-id="'+e.id+'">'+codeField(e.id)+'<label for="ct-'+e.id+'">ความคิดเห็น</label><textarea id="ct-'+e.id+'" class="ctext" placeholder="ถามเพื่อน ตอบเพื่อน หรือวางลิงก์ (Classroom / Canva / YouTube)"></textarea><label for="cf-'+e.id+'">แนบรูป (ไม่เกิน 2 รูป)</label><input type="file" id="cf-'+e.id+'" class="cfile" accept="image/*" multiple><div class="thumbs cthumbs">'+cthumbs(e.id)+'</div><p class="err cerr" role="alert"></p><button class="btn" type="submit">โพสต์ความคิดเห็น</button></form></div>';
 }
 function cardHtml(e){
   var s=subj(e.sid);
@@ -319,7 +325,7 @@ function cardHtml(e){
   var hw=e.hw
     ?'<div class="chips"><span class="chip">⚠ มีการบ้าน</span><span class="chip due">📅 ส่ง: '+fmt(e.due)+'</span></div><p><b>🎯 โจทย์การบ้าน:</b> '+linkify(e.detail)+'</p>'
     :'<div class="nohw">✓ ไม่มีการบ้าน</div>';
-  return '<article class="card'+(e.hw?' hw':'')+'">'+tools+'<h3>'+esc(s.code+' '+s.name)+'</h3><p><b>📝 งานในคาบ:</b> '+linkify(e.lesson)+'</p>'+pics+hw+'<div class="byline">บันทึกโดย '+esc(e.author)+'</div><button class="cbtn" type="button" data-ctoggle="'+e.id+'" aria-expanded="'+(state.open[e.id]?'true':'false')+'">💬 '+e.comments.length+' <span>ความคิดเห็น</span><i>'+(state.open[e.id]?'▾ ย่อ':'▸ อ่าน / เขียน')+'</i></button>'+(state.open[e.id]?commentsHtml(e):'')+'</article>';
+  return '<article class="card'+(e.hw?' hw':'')+'"><h3>'+esc(s.code+' '+s.name)+'</h3><p><b>📝 งานในคาบ:</b> '+linkify(e.lesson)+'</p>'+pics+hw+'<div class="meta"><span class="byline">บันทึกโดย '+esc(e.author)+'</span>'+tools+'</div><button class="cbtn" type="button" data-ctoggle="'+e.id+'" aria-expanded="'+(state.open[e.id]?'true':'false')+'">💬 '+e.comments.length+' <span>ความคิดเห็น</span><i>'+(state.open[e.id]?'▾ ย่อ':'▸ อ่าน / เขียน')+'</i></button>'+(state.open[e.id]?commentsHtml(e):'')+'</article>';
 }
 function renderCards(){
   $('pickDate').value=state.date;
@@ -454,6 +460,7 @@ var delTimer;
 $('cards').addEventListener('click',function(ev){
   var t=ev.target,ed=t.closest('[data-edit]'),dl=t.closest('[data-del]'),ct=t.closest('[data-ctoggle]'),z=t.closest('[data-zoom]'),rm=t.closest('[data-crm]');
   if(ct){var id=ct.getAttribute('data-ctoggle');state.open[id]=!state.open[id];renderCards();return}
+  if(ev.target.closest('[data-cforget]')){state.student=null;save('mock-student',null);renderCards();return}
   if(z){$('lbimg').src=z.src;$('lb').hidden=false;return}
   if(rm){var q=rm.getAttribute('data-crm').split(':');state.cpend[q[0]].splice(Number(q[1]),1);rm.closest('.cthumbs').innerHTML=cthumbs(q[0]);return}
   if(ed){
@@ -483,9 +490,9 @@ $('cards').addEventListener('change',async function(ev){
 $('cards').addEventListener('submit',function(ev){
   var form=ev.target;if(!form.classList.contains('cform'))return;
   ev.preventDefault();
-  var id=form.getAttribute('data-id'),c=form.querySelector('.ccode').value.trim(),t=form.querySelector('.ctext').value.trim(),err=form.querySelector('.cerr');
+  var id=form.getAttribute('data-id'),ci=form.querySelector('.ccode'),c=state.student||(ci?ci.value.trim():''),t=form.querySelector('.ctext').value.trim(),err=form.querySelector('.cerr');
   var photos=(state.cpend[id]||[]).map(function(p){return p.url});
-  if(!/^101(0[1-9]|[12]\d|30)$/.test(c)){err.textContent='ไม่พบรหัสนักเรียนนี้ในห้อง (ตัวอย่าง: 10101–10130)';return}
+  if(!/^101(0[1-9]|[12]\d|30)$/.test(c)){err.textContent='ไม่พบรหัสนี้ในห้อง ลองใหม่อีกครั้ง';return}
   if(!t&&!photos.length){err.textContent='กรุณาเขียนข้อความหรือแนบรูป';return}
   var e=entries.filter(function(x){return x.id===Number(id)})[0],now=new Date();
   state.student=c;save('mock-student',c);
