@@ -3,19 +3,18 @@ import { and, eq, notInArray } from 'drizzle-orm';
 import { todayInBangkok, isIsoDate } from '#lib/dates.js';
 import { attachments, comments, entries, subjects } from '#lib/server/db/schema.js';
 import { clampText, MAX_COMMENT_IMAGES, MAX_ENTRY_IMAGES } from '#lib/validate.js';
-import { findStudentByCode, loadMain, loadSubjects } from '#lib/server/queries.js';
-import { adminContext, forgetStudentAction, loginAction, logoutAction, roomContext } from '#lib/server/room.js';
-import { clearFailures, isLimited, recordFailure } from '#lib/server/rate-limit.js';
-import { setStudentCookie } from '#lib/server/session.js';
+import { loadMain, loadSubjects } from '#lib/server/queries.js';
+import { adminContext, forgetStudentAction, identifyStudent, identifyWriter, loginAction, logoutAction, rememberStudent, roomContext } from '#lib/server/room.js';
 import { pickFiles, saveImages } from '#lib/server/uploads.js';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
 	const { db, room, actor, student } = await roomContext(event);
 	const today = todayInBangkok();
+	const viewer = { admin: !!actor, studentId: student?.id ?? null };
 	const [main, allSubjects] = await Promise.all([
-		loadMain(db, room, { term: event.url.searchParams.get('term'), date: event.url.searchParams.get('d') }, today),
-		actor ? loadSubjects(db, room.cls.id) : Promise.resolve([])
+		loadMain(db, room, { term: event.url.searchParams.get('term'), date: event.url.searchParams.get('d') }, today, viewer),
+		loadSubjects(db, room.cls.id)
 	]);
 	const formSubjects = allSubjects.filter((s) => s.active);
 	return {
@@ -60,10 +59,13 @@ export const actions: Actions = {
 	forgetStudent: forgetStudentAction,
 
 	saveEntry: async (event) => {
-		const { ctx, denied } = await adminContext(event);
-		if (denied) return denied;
-		const { db, env, room, actor } = ctx;
+		const ctx = await roomContext(event);
+		const { db, env, room } = ctx;
 		const form = await event.request.formData();
+		const who = await identifyWriter(ctx, String(form.get('code') ?? ''));
+		if ('error' in who) return fail(who.status, { error: who.error });
+		const writer = who.writer;
+
 		const date = String(form.get('date') ?? '');
 		const subjectId = Number(form.get('subjectId'));
 		const lesson = clampText(form.get('lesson'));
@@ -74,7 +76,7 @@ export const actions: Actions = {
 		const files = pickFiles(form, 'photos');
 
 		const cur = room.current;
-		if (!cur) return fail(400, { error: 'ยังไม่ได้ตั้งภาคเรียนปัจจุบัน ไปที่หน้าจัดการห้อง → ตั้งค่า' });
+		if (!cur) return fail(400, { error: 'ยังไม่ได้ตั้งภาคเรียนปัจจุบัน ให้แอดมินตั้งที่หน้าจัดการห้อง → ตั้งค่า' });
 		if (!isIsoDate(date) || !subjectId || !lesson) return fail(400, { error: 'กรุณากรอกวันที่ วิชา และสิ่งที่เรียน' });
 		if (date < cur.startDate || date > cur.endDate) {
 			return fail(400, { error: `วันที่อยู่นอก${cur.name} เลือกวันที่ในภาคเรียนปัจจุบัน` });
@@ -95,6 +97,13 @@ export const actions: Actions = {
 			.where(and(eq(entries.classId, room.cls.id), eq(entries.entryDate, date), eq(entries.subjectId, subjectId)))
 			.get();
 		if (!existing && !subject.active) return fail(400, { error: 'วิชานี้ถูกซ่อนอยู่ เลือกวิชาอื่น' });
+		if (existing && writer.kind === 'student') {
+			// students may only change their own card; anyone else's can be answered with a comment
+			if (existing.hidden) return fail(400, { error: 'การ์ดวิชานี้ของวันที่เลือกถูกซ่อนโดยแอดมิน ติดต่อแอดมินห้อง' });
+			if (existing.authorStudentId !== writer.studentId) {
+				return fail(400, { error: `วิชานี้ของวันที่เลือกมีบันทึกอยู่แล้ว (โดย ${existing.authorDisplay}) แก้ไขได้เฉพาะผู้บันทึกหรือแอดมิน เขียนเพิ่มเป็นความคิดเห็นใต้การ์ดได้` });
+			}
+		}
 
 		const keptPhotos = existing
 			? (await db.select({ id: attachments.id }).from(attachments).where(eq(attachments.entryId, existing.id)).all())
@@ -108,8 +117,9 @@ export const actions: Actions = {
 			hasHomework,
 			homeworkDetail: hasHomework ? detail : null,
 			homeworkDue: hasHomework ? due : null,
-			authorAdminId: actor!.adminId,
-			authorDisplay: actor!.display,
+			authorAdminId: writer.kind === 'admin' ? writer.adminId : null,
+			authorStudentId: writer.kind === 'student' ? writer.studentId : null,
+			authorDisplay: writer.display,
 			hidden: false,
 			hiddenBy: null,
 			hiddenAt: null,
@@ -136,19 +146,24 @@ export const actions: Actions = {
 				.get();
 			entryId = row.id;
 		}
+		if (writer.kind === 'student' && writer.remember) await rememberStudent(ctx, writer.studentId);
 		const err = await saveImages(env, db, { classId: room.cls.id, files, entryId });
 		if (err) return fail(400, { error: `${err} (บันทึกข้อความแล้ว แต่รูปไม่ถูกบันทึก)`, date });
 		return { ok: true as const, date, updated: !!existing };
 	},
 
 	hideEntry: async (event) => {
-		const { ctx, denied } = await adminContext(event);
-		if (denied) return denied;
+		const ctx = await roomContext(event);
+		if (!ctx.room.cls.active) return fail(403, { error: 'ห้องนี้ปิดอยู่ (อ่านอย่างเดียว)' });
 		const id = Number((await event.request.formData()).get('id'));
+		const entry = await ctx.db.select().from(entries).where(and(eq(entries.id, id), eq(entries.classId, ctx.room.cls.id))).get();
+		if (!entry) return fail(404, { error: 'ไม่พบการ์ด' });
+		const mine = !!ctx.student && entry.authorStudentId === ctx.student.id;
+		if (!ctx.actor && !mine) return fail(403, { error: 'ซ่อนได้เฉพาะผู้บันทึกหรือแอดมิน' });
 		await ctx.db
 			.update(entries)
-			.set({ hidden: true, hiddenBy: ctx.actor!.display, hiddenAt: Date.now() })
-			.where(and(eq(entries.id, id), eq(entries.classId, ctx.room.cls.id)));
+			.set({ hidden: true, hiddenBy: ctx.actor?.display ?? entry.authorDisplay, hiddenAt: Date.now() })
+			.where(eq(entries.id, id));
 		return { hidden: true as const };
 	},
 
@@ -169,7 +184,7 @@ export const actions: Actions = {
 
 	comment: async (event) => {
 		const ctx = await roomContext(event);
-		const { db, env, room, c, ip } = ctx;
+		const { db, env, room } = ctx;
 		if (!room.cls.active) return fail(403, { error: 'ห้องนี้ปิดอยู่ (อ่านอย่างเดียว)', entryId: null });
 		const form = await event.request.formData();
 		const entryId = Number(form.get('entryId'));
@@ -186,21 +201,9 @@ export const actions: Actions = {
 		if (!body && files.length === 0) return reply('กรุณาเขียนข้อความหรือแนบรูป');
 		if (files.length > MAX_COMMENT_IMAGES) return reply(`แนบรูปได้ไม่เกิน ${MAX_COMMENT_IMAGES} รูป`);
 
-		let student = ctx.student;
-		let remember = false;
-		if (!student) {
-			const code = String(form.get('code') ?? '').trim();
-			const key = `code:${ip}`;
-			if (await isLimited(db, key, 10)) return reply('ลองผิดหลายครั้งเกินไป กรุณารอ 15 นาทีแล้วลองใหม่');
-			const found = code ? await findStudentByCode(db, room.cls.id, code) : undefined;
-			if (!found || !found.active) {
-				await recordFailure(db, key);
-				return reply('ไม่พบรหัสนี้ในห้อง ลองใหม่อีกครั้ง');
-			}
-			await clearFailures(db, key);
-			student = found;
-			remember = true;
-		}
+		const who = await identifyStudent(ctx, String(form.get('code') ?? ''));
+		if ('error' in who) return reply(who.error ?? 'ไม่พบรหัสนี้ในห้อง');
+		const student = who.student;
 
 		const row = await db
 			.insert(comments)
@@ -212,7 +215,7 @@ export const actions: Actions = {
 			await db.delete(comments).where(eq(comments.id, row.id));
 			return reply(err);
 		}
-		if (remember) await setStudentCookie(c, room.cls, student.id);
+		if (who.remember) await rememberStudent(ctx, student.id);
 		return { commented: true as const, entryId, seatNo: student.seatNo };
 	}
 };

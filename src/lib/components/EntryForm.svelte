@@ -11,13 +11,14 @@
 
 	interface Props {
 		slug: string;
-		display: string;
+		/** Who is writing: a signed-in room admin, a remembered student, or nobody yet (then the form asks for the code). */
+		identity: { kind: 'admin'; display: string } | { kind: 'student'; seatNo: number } | null;
 		subjects: { id: number; code: string; name: string }[];
 		term: { name: string; startDate: string; endDate: string } | null;
 		date: string;
 		subjectId: string;
 	}
-	let { slug, display, subjects, term, date = $bindable(), subjectId = $bindable() }: Props = $props();
+	let { slug, identity, subjects, term, date = $bindable(), subjectId = $bindable() }: Props = $props();
 
 	let lesson = $state('');
 	let hasHomework = $state('0');
@@ -27,6 +28,8 @@
 	let keep = $state<number[]>([]);
 	let pending = $state<Shrunk[]>([]);
 	let editing = $state(false);
+	let notice = $state('');
+	let blocked = $state(false);
 	let error = $state('');
 	let busy = $state(false);
 	let seq = 0;
@@ -50,19 +53,27 @@
 			return;
 		}
 		fetch(`/c/${slug}/entry?date=${encodeURIComponent(d)}&subject=${encodeURIComponent(s)}`)
-			.then((r) => r.json() as Promise<{ exists: boolean; lesson: string; hasHomework: boolean; detail: string; due: string; photos: number[] }>)
+			.then((r) => r.json() as Promise<{ exists: boolean; editable?: boolean | null; author?: string; lesson?: string; hasHomework?: boolean; detail?: string; due?: string; photos?: number[] }>)
 			.then((j) => {
 				if (mine !== seq) return;
-				if (j.exists) {
+				notice = '';
+				blocked = false;
+				if (j.exists && j.editable) {
 					editing = true;
-					lesson = j.lesson;
+					lesson = j.lesson ?? '';
 					hasHomework = j.hasHomework ? '1' : '0';
-					detail = j.detail;
-					due = j.due;
-					existing = j.photos;
-				} else if (editing) {
+					detail = j.detail ?? '';
+					due = j.due ?? '';
+					existing = j.photos ?? [];
+					return;
+				}
+				if (editing) {
 					editing = false;
 					clearFields();
+				}
+				if (j.exists) {
+					blocked = j.editable === false;
+					notice = `วิชานี้ของวันที่เลือกมีบันทึกอยู่แล้ว (โดย ${j.author}) แก้ไขได้เฉพาะผู้บันทึกหรือแอดมิน · เขียนเพิ่มเป็นความคิดเห็นใต้การ์ดได้`;
 				}
 			})
 			.catch(() => {});
@@ -72,7 +83,8 @@
 		if (hasHomework === '1' && !due && date) due = addDays(date, 1);
 	});
 
-	const submit: SubmitFunction = ({ formData }) => {
+	const submit: SubmitFunction = ({ formData, action }) => {
+		if (action.search.includes('forgetStudent')) return; // plain "not me" button: default handling
 		busy = true;
 		error = '';
 		formData.delete('photos');
@@ -98,9 +110,19 @@
 </script>
 
 <form method="POST" action={actionUrl(page.url, 'saveEntry')} enctype="multipart/form-data" use:enhance={submit}>
-	<div class="who"><span>บันทึกโดย: <b>{display}</b></span></div>
+	<div class="who">
+		{#if identity?.kind === 'admin'}
+			<span>บันทึกโดย: <b>{identity.display}</b></span>
+		{:else if identity?.kind === 'student'}
+			<span>บันทึกโดย: <b>เลขที่ {identity.seatNo}</b></span>
+			<button class="linkbtn" type="submit" formaction={actionUrl(page.url, 'forgetStudent')} formnovalidate>ไม่ใช่ฉัน?</button>
+		{:else}
+			<span>ทุกคนในห้องบันทึกได้ แค่กรอกรหัสของคุณ</span>
+		{/if}
+	</div>
 	<h3 style="margin-top: 8px">{editing ? 'แก้ไขข้อมูลที่บันทึกไว้' : 'ฟอร์มบันทึกข้อมูล'}</h3>
 	{#if editing}<div class="note-edit">วิชานี้มีบันทึกของวันที่เลือกอยู่แล้ว กำลังแก้ไขของเดิม ไม่สร้างซ้ำ</div>{/if}
+	{#if notice}<div class="note-edit" role="status">{notice}</div>{/if}
 	{#if term}<p class="hint">เลือกวันที่ได้ในช่วง {term.name} ({fmtDate(term.startDate)} – {fmtDate(term.endDate)})</p>{/if}
 	<div class="cols">
 		<div>
@@ -130,6 +152,11 @@
 		<input type="date" id="fdue" name="due" bind:value={due} />
 	{/if}
 	<PhotoPicker id="fphotos" max={3} label="แนบรูป (ไม่เกิน 3 รูป · ถ่ายจากมือถือได้ ระบบย่อให้เอง)" {existing} bind:pending bind:keep />
+	{#if !identity}
+		<label for="fcode">รหัส *</label>
+		<input type="password" id="fcode" name="code" autocomplete="off" placeholder="รหัสของคุณ" />
+		<p class="hint">กรอกครั้งเดียว ระบบจำเครื่องนี้ไว้ ไม่ต้องกรอกอีก</p>
+	{/if}
 	{#if error}<p class="err" role="alert">{error}</p>{/if}
-	<button class="btn" type="submit" disabled={busy}>{busy ? 'กำลังบันทึก…' : editing ? 'บันทึกการแก้ไข' : 'บันทึกข้อมูล'}</button>
+	<button class="btn" type="submit" disabled={busy || blocked}>{busy ? 'กำลังบันทึก…' : editing ? 'บันทึกการแก้ไข' : 'บันทึกข้อมูล'}</button>
 </form>

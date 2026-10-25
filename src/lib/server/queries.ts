@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gte, inArray, lt, max, sql } from 'drizzle-orm';
-import { addDays, clampDate, isIsoDate } from '#lib/dates.js';
+import { addDays, isIsoDate } from '#lib/dates.js';
 import { attachments, classes, comments, entries, students, subjects, terms } from './db/schema';
 import type { CardView, HomeworkRow } from '#lib/types.js';
 import type { Db } from './env';
@@ -39,7 +39,18 @@ export async function loadRoom<T = undefined>(
 	return { room: { cls, terms: list, current }, extra };
 }
 
-export async function loadMain(db: Db, room: Room, params: { term?: string | null; date?: string | null }, today: string) {
+export interface Viewer {
+	admin: boolean;
+	studentId: number | null;
+}
+
+export async function loadMain(
+	db: Db,
+	room: Room,
+	params: { term?: string | null; date?: string | null },
+	today: string,
+	viewer: Viewer
+) {
 	const { cls } = room;
 	const termId = Number(params.term);
 	const view = room.terms.find((t) => t.id === termId) ?? room.current ?? room.terms[0] ?? null;
@@ -57,7 +68,6 @@ export async function loadMain(db: Db, room: Room, params: { term?: string | nul
 			.get();
 		date = last?.d ?? view.endDate;
 	}
-	date = clampDate(date, view.startDate, view.endDate);
 
 	const rowsQuery = db
 		.select({
@@ -67,6 +77,7 @@ export async function loadMain(db: Db, room: Room, params: { term?: string | nul
 			homeworkDetail: entries.homeworkDetail,
 			homeworkDue: entries.homeworkDue,
 			author: entries.authorDisplay,
+			authorStudentId: entries.authorStudentId,
 			sid: subjects.id,
 			code: subjects.code,
 			name: subjects.name,
@@ -141,6 +152,7 @@ export async function loadMain(db: Db, room: Room, params: { term?: string | nul
 		homeworkDetail: r.homeworkDetail ?? '',
 		homeworkDue: r.homeworkDue,
 		author: r.author,
+		canEdit: isCurrent && room.cls.active && (viewer.admin || (viewer.studentId !== null && r.authorStudentId === viewer.studentId)),
 		photos: photosByEntry.get(r.id) ?? [],
 		comments: commentsByEntry.get(r.id) ?? []
 	}));

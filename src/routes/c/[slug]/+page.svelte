@@ -3,7 +3,7 @@
 	import { actionUrl } from '#lib/action-url.js';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
-	import { addDays, clampDate, fmtDate, groupByMonth, relDue, weekdayTh } from '#lib/dates.js';
+	import { clampDate, fmtDate, groupByMonth, relDue, weekdayTh } from '#lib/dates.js';
 	import type { CardView } from '#lib/types.js';
 	import EntryCard from '#lib/components/EntryCard.svelte';
 	import EntryForm from '#lib/components/EntryForm.svelte';
@@ -20,7 +20,7 @@
 	let loginBusy = $state(false);
 
 	const base = $derived(`/c/${data.slug}`);
-	const canEdit = $derived(!!data.actor && data.open && !!data.view?.isCurrent);
+	const isAdmin = $derived(!!data.actor && data.open && !!data.view?.isCurrent);
 	const months = $derived(groupByMonth(data.overdue, (r) => r.due));
 	const loginError = $derived((form as { loginError?: string } | null)?.loginError ?? '');
 
@@ -67,40 +67,43 @@
 		<button class="cta" id="toggle" type="button" aria-expanded={panelOpen} aria-controls="panel" onclick={openPanel}>+ บันทึกสิ่งที่เรียน / การบ้านใหม่</button>
 		{#if panelOpen}
 			<section class="panel" id="panel">
-				{#if data.actor}
-					<EntryForm
-						slug={data.slug}
-						display={data.actor.display}
-						subjects={data.subjects}
-						term={data.currentTerm}
-						bind:date={formDate}
-						bind:subjectId={formSubject}
-					/>
-					<div class="tools" style="margin-top: 12px">
+				<EntryForm
+					slug={data.slug}
+					identity={data.actor ? { kind: 'admin', display: data.actor.display } : data.student ? { kind: 'student', seatNo: data.student.seatNo } : null}
+					subjects={data.subjects}
+					term={data.currentTerm}
+					bind:date={formDate}
+					bind:subjectId={formSubject}
+				/>
+				<div class="tools" style="margin-top: 14px">
+					{#if data.actor}
 						<a class="sbtn" style="text-decoration: none; display: grid; place-items: center" href={`${base}/manage`}>⚙ จัดการห้อง</a>
-						<form method="POST" action={actionUrl(page.url, 'logout')} use:enhance style="display: contents"><button class="sbtn" type="submit">ออกจากระบบ</button></form>
-					</div>
-				{:else}
-					<h3>ก่อนบันทึก ขอทราบว่าคุณคือใคร</h3>
-					<form
-						method="POST"
-						action={actionUrl(page.url, 'login')}
-						use:enhance={() => {
-							loginBusy = true;
-							return async ({ update }) => {
-								loginBusy = false;
-								await update({ reset: false });
-							};
-						}}
-					>
-						<label for="idname">ชื่อผู้ใช้ (user name)</label>
-						<input type="text" id="idname" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="เช่น mai" />
-						<label for="idpin">รหัสผ่าน</label>
-						<input type="password" id="idpin" name="password" autocomplete="current-password" />
-						<p class="hint">กรอกครั้งเดียว ระบบจะจำเครื่องนี้ไว้ ไม่ต้องกรอกอีก · ชื่อผู้ใช้และรหัสผ่านขอได้จากผู้ดูแลระบบ</p>
-						{#if loginError}<p class="err" role="alert">{loginError}</p>{/if}
-						<button class="btn" type="submit" disabled={loginBusy}>{loginBusy ? 'กำลังตรวจสอบ…' : 'ยืนยัน'}</button>
-					</form>
+						<form method="POST" action={actionUrl(page.url, 'logout')} use:enhance style="display: contents"><button class="sbtn" type="submit">ออกจากระบบแอดมิน</button></form>
+					{/if}
+				</div>
+				{#if !data.actor}
+					<details class="adminlogin">
+						<summary>แอดมินห้อง? ล็อกอินที่นี่</summary>
+						<form
+							method="POST"
+							action={actionUrl(page.url, 'login')}
+							use:enhance={() => {
+								loginBusy = true;
+								return async ({ update }) => {
+									loginBusy = false;
+									await update({ reset: false });
+								};
+							}}
+						>
+							<label for="idname">ชื่อผู้ใช้ (user name)</label>
+							<input type="text" id="idname" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="เช่น mai" />
+							<label for="idpin">รหัสผ่าน</label>
+							<input type="password" id="idpin" name="password" autocomplete="current-password" />
+							<p class="hint">แอดมินแก้ไข/ซ่อนการ์ดและความคิดเห็นของทุกคนได้ · ลืมรหัสผ่านให้ติดต่อผู้ดูแลระบบ</p>
+							{#if loginError}<p class="err" role="alert">{loginError}</p>{/if}
+							<button class="btn" type="submit" disabled={loginBusy}>{loginBusy ? 'กำลังตรวจสอบ…' : 'ล็อกอินแอดมิน'}</button>
+						</form>
+					</details>
 				{/if}
 			</section>
 		{/if}
@@ -117,15 +120,13 @@
 				max={data.view.endDate}
 				onchange={(e) => e.currentTarget.value && go(e.currentTarget.value)}
 			/>
-			<button class="btn" type="button" onclick={() => go(addDays(data.date, -1))} aria-label="วันก่อนหน้า" disabled={data.date <= data.view.startDate}>‹ วันก่อน</button>
 			<a class="btn" style="text-decoration: none; display: grid; place-items: center; margin: 0" href={base}>วันนี้</a>
-			<button class="btn" type="button" onclick={() => go(addDays(data.date, 1))} aria-label="วันถัดไป" disabled={data.date >= data.view.endDate}>วันถัดไป ›</button>
 		</div>
 
 		{#if data.view.isCurrent && data.today < data.view.startDate}
-			<div class="warn block">ภาคเรียนนี้ยังไม่เริ่ม (เริ่ม {fmtDate(data.view.startDate)}) จึงแสดงวันแรกของภาคเรียน</div>
+			<div class="warn block">ภาคเรียนนี้ยังไม่เริ่ม (เริ่ม {fmtDate(data.view.startDate)}) ยังไม่มีบันทึกก่อนวันนั้น</div>
 		{:else if data.view.isCurrent && data.today > data.view.endDate}
-			<div class="warn block">ภาคเรียนนี้สิ้นสุดแล้ว ({fmtDate(data.view.endDate)}) จึงแสดงวันสุดท้ายของภาคเรียน · แอดมินสร้างภาคเรียนใหม่ได้ที่หน้าจัดการห้อง</div>
+			<div class="warn block">ภาคเรียนนี้สิ้นสุดแล้ว ({fmtDate(data.view.endDate)}) · แอดมินสร้างภาคเรียนใหม่ได้ที่หน้าจัดการห้อง</div>
 		{/if}
 
 		{#if data.terms.length > 1}
@@ -148,7 +149,7 @@
 		<h2 class="sec">📚 สิ่งที่เรียน (ตามวันที่เลือก)</h2>
 		<div class="grid">
 			{#each data.cards as card (card.id)}
-				<EntryCard {card} today={data.today} {canEdit} isAdmin={canEdit} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} />
+				<EntryCard {card} today={data.today} isAdmin={isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} />
 			{:else}
 				<div class="empty" style="grid-column: 1 / -1">ยังไม่มีบันทึกของวันที่ {fmtDate(data.date)}</div>
 			{/each}

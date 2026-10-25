@@ -1,0 +1,1 @@
+ALTER TABLE `entries` ADD `author_student_id` integer;

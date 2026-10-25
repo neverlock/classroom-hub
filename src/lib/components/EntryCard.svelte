@@ -10,14 +10,13 @@
 	interface Props {
 		card: CardView;
 		today: string;
-		/** Room admin on the current term: can edit and hide cards and hide comments. */
-		canEdit: boolean;
+		/** Signed-in room admin on the current term: can hide comments. Editing a card is decided per card (`card.canEdit`). */
 		isAdmin: boolean;
 		student: { seatNo: number } | null;
 		onedit: (card: CardView) => void;
 		onzoom: (src: string) => void;
 	}
-	let { card, today, canEdit, isAdmin, student, onedit, onzoom }: Props = $props();
+	let { card, today, isAdmin, student, onedit, onzoom }: Props = $props();
 
 	let open = $state(false);
 	let sureCard = $state(false);
@@ -55,7 +54,7 @@
 	{/if}
 	<div class="meta">
 		<span class="byline">บันทึกโดย {card.author}</span>
-		{#if canEdit}
+		{#if card.canEdit}
 			<div class="tools">
 				<button type="button" class="ibtn" aria-label="แก้ไข" title="แก้ไข" onclick={() => onedit(card)}>✎</button>
 				<form method="POST" action={actionUrl(page.url, 'hideEntry')} use:enhance>

@@ -4,8 +4,8 @@ import { classAdmins } from './db/schema';
 import { hashPassword, verifyPassword } from './crypto';
 import { clearFailures, isLimited, recordFailure } from './rate-limit';
 import { useEnv } from './env';
-import { loadRoom, type Room } from './queries';
-import { clearAdminCookie, clearStudentCookie, readActor, readStudent, setAdminCookie } from './session';
+import { findStudentByCode, loadRoom, type Room } from './queries';
+import { clearAdminCookie, clearStudentCookie, readActor, readStudent, setAdminCookie, setStudentCookie } from './session';
 
 type Ev = RequestEvent<{ slug: string }>;
 
@@ -100,3 +100,40 @@ export function forgetStudentAction(event: Ev) {
 }
 
 export type { Room };
+
+
+const CODE_LIMIT_IP = 10;
+
+/**
+ * Who is posting as a student: the remembered cookie, or the code typed in the form.
+ * Wrong codes are counted per IP so codes cannot be guessed quickly.
+ */
+export async function identifyStudent(ctx: RoomContext, code: string) {
+	if (ctx.student) return { student: ctx.student, remember: false as const };
+	const key = `code:${ctx.ip}`;
+	if (await isLimited(ctx.db, key, CODE_LIMIT_IP)) return { error: 'ลองผิดหลายครั้งเกินไป กรุณารอ 15 นาทีแล้วลองใหม่' };
+	const found = code.trim() ? await findStudentByCode(ctx.db, ctx.room.cls.id, code.trim()) : undefined;
+	if (!found || !found.active) {
+		await recordFailure(ctx.db, key);
+		return { error: 'ไม่พบรหัสนี้ในห้อง ลองใหม่อีกครั้ง' };
+	}
+	await clearFailures(ctx.db, key);
+	return { student: found, remember: true as const };
+}
+
+export type Writer =
+	| { kind: 'admin'; adminId: number | null; display: string }
+	| { kind: 'student'; studentId: number; display: string; remember: boolean };
+
+/** Anyone may write a card: a signed-in room admin, or a student identified by their code. */
+export async function identifyWriter(ctx: RoomContext, code: string): Promise<{ writer: Writer } | { error: string; status: number }> {
+	if (!ctx.room.cls.active) return { error: 'ห้องนี้ปิดอยู่ (อ่านอย่างเดียว)', status: 403 };
+	if (ctx.actor) return { writer: { kind: 'admin', adminId: ctx.actor.adminId, display: ctx.actor.display } };
+	const r = await identifyStudent(ctx, code);
+	if ('error' in r) return { error: r.error ?? 'ไม่พบรหัสนี้ในห้อง', status: 400 };
+	return { writer: { kind: 'student', studentId: r.student.id, display: `เลขที่ ${r.student.seatNo}`, remember: r.remember } };
+}
+
+export async function rememberStudent(ctx: RoomContext, studentId: number) {
+	await setStudentCookie(ctx.c, ctx.room.cls, studentId);
+}

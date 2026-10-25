@@ -89,7 +89,9 @@ export const entries = sqliteTable(
 		homeworkDetail: text('homework_detail'),
 		homeworkDue: text('homework_due'),
 		authorAdminId: integer('author_admin_id'),
-		/** Snapshot of the author's display name at write time. */
+		/** Set when a student wrote the card (with their code); null for room admins. */
+		authorStudentId: integer('author_student_id'),
+		/** Snapshot of the author's name at write time: the admin's display name, or "เลขที่ N" for a student. */
 		authorDisplay: text('author_display').notNull(),
 		hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
 		hiddenBy: text('hidden_by'),

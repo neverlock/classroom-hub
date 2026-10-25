@@ -99,8 +99,7 @@ input[type='file'] { width: 100%; max-width: 100%; min-width: 0; font-size: 14px
 .thumb small { display: block; color: var(--muted); }
 
 /* ---------- date + term bars ---------- */
-.datebar { margin: 18px 0 0; border: 1.5px dashed var(--hw-line); background: var(--hw-bg); border-radius: 12px; padding: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-items: center; }
-.datebar label, .datebar input { grid-column: 1 / -1; }
+.datebar { margin: 18px 0 0; border: 1.5px dashed var(--hw-line); background: var(--hw-bg); border-radius: 12px; padding: 14px; display: grid; grid-template-columns: 1fr; gap: 10px; align-items: center; }
 .datebar label { margin: 0; }
 .datebar .btn { margin: 0; width: 100%; min-height: 46px; padding: 9px 6px; font-size: 15px; }
 .termbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 2px 0; font-size: 14px; color: var(--muted); }
@@ -226,3 +225,6 @@ details.over[open] > summary::after { content: '▾ ย่อ'; }
 }
 .picbtn { border: 0; background: none; padding: 0; line-height: 0; cursor: zoom-in; border-radius: 8px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+details.adminlogin { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 4px; }
+details.adminlogin > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--muted); font-size: 14px; }

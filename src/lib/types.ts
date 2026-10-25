@@ -16,6 +16,8 @@ export interface CardView {
 	homeworkDetail: string;
 	homeworkDue: string | null;
 	author: string;
+	/** The signed-in viewer may edit/hide this card (room admin, or the student who wrote it). */
+	canEdit: boolean;
 	photos: number[];
 	comments: CommentView[];
 }
