@@ -2,7 +2,8 @@ import { fail, redirect } from '@sveltejs/kit';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { attachments, classAdmins, classes, entries, students, subjects, terms } from '#lib/server/db/schema.js';
 import { hashPassword } from '#lib/server/crypto.js';
-import { batch, useEnv } from '#lib/server/env.js';
+import { useEnv } from '#lib/server/env.js';
+import { loadAdminOverview } from '#lib/server/queries.js';
 import { iterationsFor } from '#lib/server/room.js';
 import { setSuperCookie } from '#lib/server/session.js';
 import { addDays, todayInBangkok } from '#lib/dates.js';
@@ -11,29 +12,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
 	const { db } = useEnv(event);
-	// all reads in ONE round trip to D1
-	const [rooms, entryRows, studentRows, admins, postRows, byteRows] = (await batch(db, [
-		db
-			.select({ id: classes.id, slug: classes.slug, active: classes.active, label: terms.classLabel, term: terms.name })
-			.from(classes)
-			.leftJoin(terms, eq(classes.currentTermId, terms.id))
-			.orderBy(asc(classes.id)),
-		db.select({ id: entries.classId, n: sql<number>`count(*)` }).from(entries).groupBy(entries.classId),
-		db.select({ id: students.classId, n: sql<number>`count(*)` }).from(students).groupBy(students.classId),
-		db
-			.select({ id: classAdmins.id, classId: classAdmins.classId, display: classAdmins.display, username: classAdmins.username, active: classAdmins.active })
-			.from(classAdmins)
-			.orderBy(asc(classAdmins.id)),
-		db.select({ id: entries.authorAdminId, n: sql<number>`count(*)` }).from(entries).groupBy(entries.authorAdminId),
-		db.select({ n: sql<number>`coalesce(sum(${attachments.size}), 0)` }).from(attachments)
-	])) as [
-		{ id: number; slug: string; active: boolean; label: string | null; term: string | null }[],
-		{ id: number; n: number }[],
-		{ id: number; n: number }[],
-		{ id: number; classId: number; display: string; username: string; active: boolean }[],
-		{ id: number | null; n: number }[],
-		{ n: number }[]
-	];
+	const { rooms, entryRows, studentRows, admins, postRows, byteRows } = await loadAdminOverview(db);
 	const entryCount = new Map(entryRows.map((r) => [r.id, r.n]));
 	const studentCount = new Map(studentRows.map((r) => [r.id, r.n]));
 	const posts = new Map(postRows.map((r) => [r.id, r.n]));

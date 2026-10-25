@@ -80,7 +80,9 @@ export async function loadMain(
 				homeworkDue: entries.homeworkDue,
 				author: entries.authorDisplay,
 				authorStudentId: entries.authorStudentId,
-				sid: subjects.id,
+				// D1 batch rows are keyed by column name: entries.id and subjects.id would collapse into one `id`
+				// and shift every later column, so the second one needs its own name
+				sid: sql<number>`${subjects.id}`.as('subject_id'),
 				code: subjects.code,
 				name: subjects.name,
 				teacher: subjects.teacher
@@ -179,4 +181,84 @@ export async function findStudentByCode(db: Db, classId: number, code: string) {
 export async function countEntries(db: Db, classId: number): Promise<number> {
 	const r = await db.select({ n: sql<number>`count(*)` }).from(entries).where(eq(entries.classId, classId)).get();
 	return r?.n ?? 0;
+}
+
+/** The six lists of the manage page, in ONE round trip to D1. */
+export async function loadManageData(db: Db, classId: number) {
+	const [subjectRows, counts, studentRows, admins, hiddenEntries, hiddenComments] = (await batch(db, [
+		db.select().from(subjects).where(eq(subjects.classId, classId)).orderBy(asc(subjects.sortOrder), asc(subjects.id)),
+		db.select({ id: entries.subjectId, n: sql<number>`count(*)` }).from(entries).where(eq(entries.classId, classId)).groupBy(entries.subjectId),
+		db.select().from(students).where(eq(students.classId, classId)).orderBy(asc(students.seatNo), asc(students.id)),
+		db
+			.select({ id: classAdmins.id, display: classAdmins.display, username: classAdmins.username, active: classAdmins.active, lastLoginAt: classAdmins.lastLoginAt })
+			.from(classAdmins)
+			.where(eq(classAdmins.classId, classId))
+			.orderBy(asc(classAdmins.id)),
+		db
+			.select({
+				id: entries.id,
+				date: entries.entryDate,
+				code: subjects.code,
+				name: subjects.name,
+				by: entries.hiddenBy,
+				at: entries.hiddenAt,
+				comments: sql<number>`(select count(*) from comments where comments.entry_id = ${entries.id})`,
+				photos: sql<number>`(select count(*) from attachments where attachments.entry_id = ${entries.id}) + (select count(*) from attachments join comments on attachments.comment_id = comments.id where comments.entry_id = ${entries.id})`
+			})
+			.from(entries)
+			.innerJoin(subjects, eq(entries.subjectId, subjects.id))
+			.where(and(eq(entries.classId, classId), eq(entries.hidden, true)))
+			.orderBy(desc(entries.hiddenAt)),
+		db
+			.select({
+				id: comments.id,
+				seat: comments.seatNo,
+				body: comments.body,
+				date: entries.entryDate,
+				code: subjects.code,
+				by: comments.hiddenBy,
+				at: comments.hiddenAt,
+				photos: sql<number>`(select count(*) from attachments where attachments.comment_id = ${comments.id})`
+			})
+			.from(comments)
+			.innerJoin(entries, eq(comments.entryId, entries.id))
+			.innerJoin(subjects, eq(entries.subjectId, subjects.id))
+			.where(and(eq(entries.classId, classId), eq(comments.hidden, true)))
+			.orderBy(desc(comments.hiddenAt))
+	])) as [
+		(typeof subjects.$inferSelect)[],
+		{ id: number; n: number }[],
+		(typeof students.$inferSelect)[],
+		{ id: number; display: string; username: string; active: boolean; lastLoginAt: number | null }[],
+		{ id: number; date: string; code: string; name: string; by: string | null; at: number | null; comments: number; photos: number }[],
+		{ id: number; seat: number; body: string; date: string; code: string; by: string | null; at: number | null; photos: number }[]
+	];
+	return { subjectRows, counts, studentRows, admins, hiddenEntries, hiddenComments };
+}
+
+/** Everything the super admin page lists, in ONE round trip to D1. */
+export async function loadAdminOverview(db: Db) {
+	const [rooms, entryRows, studentRows, admins, postRows, byteRows] = (await batch(db, [
+		db
+			.select({ id: classes.id, slug: classes.slug, active: classes.active, label: terms.classLabel, term: terms.name })
+			.from(classes)
+			.leftJoin(terms, eq(classes.currentTermId, terms.id))
+			.orderBy(asc(classes.id)),
+		db.select({ id: entries.classId, n: sql<number>`count(*)` }).from(entries).groupBy(entries.classId),
+		db.select({ id: students.classId, n: sql<number>`count(*)` }).from(students).groupBy(students.classId),
+		db
+			.select({ id: classAdmins.id, classId: classAdmins.classId, display: classAdmins.display, username: classAdmins.username, active: classAdmins.active })
+			.from(classAdmins)
+			.orderBy(asc(classAdmins.id)),
+		db.select({ id: entries.authorAdminId, n: sql<number>`count(*)` }).from(entries).groupBy(entries.authorAdminId),
+		db.select({ n: sql<number>`coalesce(sum(${attachments.size}), 0)` }).from(attachments)
+	])) as [
+		{ id: number; slug: string; active: boolean; label: string | null; term: string | null }[],
+		{ id: number; n: number }[],
+		{ id: number; n: number }[],
+		{ id: number; classId: number; display: string; username: string; active: boolean }[],
+		{ id: number | null; n: number }[],
+		{ n: number }[]
+	];
+	return { rooms, entryRows, studentRows, admins, postRows, byteRows };
 }
