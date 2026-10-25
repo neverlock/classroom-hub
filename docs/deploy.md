@@ -5,6 +5,14 @@ D1 `classroom-hub`, R2 `classroom-hub-images`, ตัวแปรของ Cloud
 
 > repo นี้เป็น **public** อย่า commit ความลับ (`SESSION_SECRET`, `SUPER_ADMINS`, รหัสผ่าน) ลงไฟล์ใดๆ
 
+## Branch และการขึ้น production
+
+- **`main` = production** Cloudflare (Workers Builds) build และ deploy เฉพาะเมื่อมีคอมมิตใหม่เข้า `main` และ GitHub ใช้ `main` เป็น default branch
+- งานใหม่ทำบน branch อื่น (เช่น `claude/...`) แล้วเปิด Pull Request เข้า `main` ตรวจแล้วจึง merge เว็บจริงจะเปลี่ยนตอน merge เท่านั้น
+- เปลี่ยนการตั้งค่า (เช่น Production branch) **ไม่ทำให้เกิด build ใหม่** และปุ่ม Retry build ใน dashboard จะ build คอมมิตเดิมซ้ำ ถ้าต้องการให้ build `main` ให้ push หรือ merge คอมมิตใหม่เข้า `main`
+- การย้อนกลับ: Workers & Pages → `classroom-hub` → Deployments เลือกเวอร์ชันก่อนหน้า Rollback ได้ทันที (ฐานข้อมูลไม่ย้อนตาม ดู migration ด้านล่าง)
+- migration ของ D1 รันตอน deploy ของ `main` เท่านั้น (Deploy command `npm run deploy`) migration ควรเพิ่มอย่างเดียว (เพิ่มตาราง/คอลัมน์) เพื่อให้ Rollback เวอร์ชันโค้ดยังใช้ได้
+
 ## ครั้งเดียว (ใน Cloudflare dashboard)
 
 1. **Secret ของ Worker** (Workers & Pages → `classroom-hub` → Settings → Variables and Secrets → Add → Secret)
