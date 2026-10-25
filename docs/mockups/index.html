@@ -28,6 +28,7 @@
   --good:#6fcb7e; --danger:#ff8d7a; --panel:#33281d; --focus:#7db4ff; color-scheme:dark}
 
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.55;
   padding-block:20px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:980px;margin:0 auto;background:var(--surface);border-radius:20px;border-top:12px solid var(--ink);
@@ -103,12 +104,30 @@ details.over[open]>summary::after{content:"▾ ย่อ"}
 .month{margin:16px 0 8px;font-weight:700;color:var(--muted);display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:4px}
 .more{margin-top:14px}
 
-/* notes */
-.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.note header{font-size:13px;color:var(--muted);margin-bottom:2px}
-.note header b{color:var(--ink)}
-.note p{margin:0;overflow-wrap:anywhere}
-.notebar{margin-top:14px}
+
+/* photos + comments inside cards */
+.pics img{width:88px;height:88px;cursor:zoom-in}
+.cbtn{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:0;border-top:1px dashed var(--line);margin-top:4px;padding:10px 2px 2px;cursor:pointer;font-weight:700;text-align:left}
+.cbtn span{font-weight:500;color:var(--muted)}
+.cbtn i{margin-left:auto;font-style:normal;color:var(--muted)}
+.cmts{display:flex;flex-direction:column;gap:10px;padding-top:6px}
+.cm{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.card.hw .cm{background:var(--surface)}
+.cm header{font-size:13px;color:var(--muted)}
+.cm header b{color:var(--ink)}
+.cm p{margin:2px 0 0}
+.cm .pics{margin-top:6px}
+.cform{background:var(--panel);border-radius:10px;padding:4px 12px 12px}
+.cform label{margin:10px 0 4px;font-size:14px}
+.cform textarea{min-height:64px}
+.cform .btn{margin-top:12px;font-size:16px;padding:10px 14px}
+.cform input[type=file]{font-size:13px}
+.lnk{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:1px 10px;margin:1px 2px;border-radius:99px;background:var(--surface);border:1.5px solid var(--ink);color:var(--ink);font-weight:700;font-size:14px;text-decoration:none;vertical-align:baseline;overflow-wrap:anywhere}
+.lnk:hover{background:var(--accent);color:var(--accent-ink);border-color:var(--accent-ink)}
+.lnk b{font-weight:700}
+.lnk small{font-weight:400;color:var(--muted);font-size:12px}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:30;cursor:zoom-out;padding:16px}
+.lb img{max-width:92vw;max-height:88vh;border-radius:10px;background:#fff}
 .foot{margin-top:28px;font-size:13px;color:var(--muted);text-align:center}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:11px 20px;border-radius:99px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:20;max-width:calc(100% - 32px)}
 @media (max-width:560px){.row{grid-template-columns:1fr}.item{flex-direction:column}}
@@ -144,6 +163,7 @@ details.over[open]>summary::after{content:"▾ ย่อ"}
       </div>
       <label for="flesson">สิ่งที่เรียนวันนี้ (เนื้อหาที่เรียน/งานในคาบ) *</label>
       <textarea id="flesson" required></textarea>
+      <p class="hint">วางลิงก์ Google Classroom / Canva / YouTube ในข้อความได้เลย ระบบจะแสดงเป็นปุ่มให้กด</p>
       <label for="fhw">การบ้าน *</label>
       <select id="fhw"><option value="0">ไม่มี</option><option value="1">มี</option></select>
       <div id="hwFields" hidden>
@@ -179,23 +199,9 @@ details.over[open]>summary::after{content:"▾ ย่อ"}
     <div class="over-body" id="overBody"></div>
   </details>
 
-  <h2>💬 ข้อความจากเพื่อน</h2>
-  <div class="list" id="notes"></div>
-  <div class="notebar">
-    <button class="btn alt" id="noteToggle" type="button" aria-expanded="false">+ เขียนข้อความ</button>
-    <form id="noteForm" hidden style="margin-top:12px">
-      <label for="ncode" style="margin-top:0">รหัสนักเรียน</label>
-      <input type="text" id="ncode" inputmode="numeric" autocomplete="off" placeholder="เช่น 10112">
-      <p class="hint" id="nwho">ตัวอย่าง: 10112 จะแสดงเป็น "เลขที่ 12" · กรอกครั้งเดียว ระบบจำเครื่องนี้ไว้</p>
-      <label for="ntext">ข้อความ</label>
-      <textarea id="ntext"></textarea>
-      <p class="err" id="nerr" role="alert"></p>
-      <button class="btn" type="submit">โพสต์ข้อความ</button>
-    </form>
-  </div>
-
   <p class="foot">หน้าตัวอย่างสำหรับตรวจแบบ · ข้อมูลทั้งหมดเป็นข้อมูลสมมติและไม่ถูกเก็บถาวร</p>
 </div>
+<div class="lb" id="lb" hidden><img id="lbimg" alt="รูปขยาย"></div>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
@@ -222,15 +228,20 @@ var subjects=[
 ];
 var subj=function(id){return subjects.filter(function(s){return s.id===id})[0]};
 
+function mkPhoto(label,hue){
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="480" height="360" fill="hsl('+hue+',55%,82%)"/><rect x="40" y="40" width="400" height="250" rx="10" fill="hsl('+hue+',60%,96%)" stroke="hsl('+hue+',40%,45%)" stroke-width="3"/><path d="M70 100h340M70 140h300M70 180h340M70 220h240" stroke="hsl('+hue+',35%,60%)" stroke-width="4" fill="none"/><text x="240" y="330" font-size="24" text-anchor="middle" fill="hsl('+hue+',40%,25%)" font-family="sans-serif">'+label+' (รูปตัวอย่าง)</text></svg>';
+  return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+}
+function ent(off,sid){var d=addDays(TODAY,off);return entries.filter(function(e){return e.date===d&&e.sid===sid})[0]}
 var nextId=1, entries=[];
 function seed(dayOff,sid,lesson,hwDetail,dueOff,author){
   entries.push({id:nextId++,date:addDays(TODAY,dayOff),sid:sid,lesson:lesson,
-    hw:hwDetail?1:0,detail:hwDetail||'',due:hwDetail?addDays(TODAY,dueOff):'',author:author||'แม่น้องมาย',photos:[]});
+    hw:hwDetail?1:0,detail:hwDetail||'',due:hwDetail?addDays(TODAY,dueOff):'',author:author||'แม่น้องมาย',photos:[],comments:[]});
 }
 seed(0,'m','การหาร เลขทศนิยม','ทำข้อหนึ่งข้อสอง ลงในสมุด ส่วนที่เหลือทำในหนังสือ หน้า195',2);
 seed(0,'e','เรียนบทที่ 4 ต่อ');
-seed(0,'l','เรียนเรื่องการท่องเที่ยว');
-seed(0,'c','เรียนบทที่ 4','หน้า111 112 แค่ข้อ1กับ 3 115 ลงใน Canva ส่งวันนี้ 23.59',0,'ครูต้น');
+seed(0,'l','เรียนเรื่องการท่องเที่ยว ดูคลิปประกอบ https://www.youtube.com/watch?v=abc123XYZ');
+seed(0,'c','เรียนบทที่ 4','หน้า111 112 แค่ข้อ1กับ 3 115 ลงใน Canva https://www.canva.com/design/DAFexample/edit ส่งวันนี้ 23.59',0,'ครูต้น');
 seed(0,'b','Natural disasters');
 seed(-1,'m','การคูณเลขทศนิยม','แบบฝึกหัด 3.2 หน้า 88 ทุกข้อ',4);
 seed(-2,'e','Unit 3 Vocabulary','เขียนศัพท์ 20 คำ คำละ 3 รอบ',-1);
@@ -244,13 +255,17 @@ seed(-70,'b','Online shopping','สรุปข้อดีข้อเสีย
 seed(-88,'m','ตัวประกอบของจำนวนนับ','แบบฝึกหัด 1.2 หน้า 18',-75);
 seed(-110,'e','Unit 1 Greetings','ท่อง dialogue หน้า 8',-95);
 
-var notes=[
- {seat:12,time:'วันนี้ 14:30',text:'พรุ่งนี้ต้องเอาสีน้ำมาด้วยนะ ครูบอกตอนท้ายคาบศิลปะ'},
- {seat:5,time:'เมื่อวาน 18:02',text:'ใครมีชีทวิทย์ที่ครูแจกวันนี้บ้าง ขอถ่ายรูปหน่อยครับ'},
- {seat:21,time:'เมื่อวาน 16:45',text:'แบบฝึกหัดคณิตหน้า 88 ข้อ 7 ครูบอกว่าให้ข้ามได้'}
-];
+ent(0,'m').photos=[mkPhoto('โจทย์บนกระดาน',35),mkPhoto('หนังสือ หน้า 195',200)];
+ent(0,'c').photos=[mkPhoto('ตัวอย่างงานใน Canva',280)];
+ent(0,'l').photos=[mkPhoto('สไลด์เรื่องการท่องเที่ยว',150)];
+ent(-1,'m').photos=[mkPhoto('แบบฝึกหัด 3.2',20)];
+ent(0,'m').comments=[
+ {seat:12,time:'วันนี้ 14:30',text:'ข้อ 1 กับข้อ 2 คือหน้า 195 ใช่ไหมครับ',photos:[]},
+ {seat:5,time:'วันนี้ 15:10',text:'ใช่ครับ นี่คือโจทย์ที่ครูเขียนบนกระดาน',photos:[mkPhoto('ถ่ายจากกระดาน',120)]}];
+ent(0,'c').comments=[{seat:21,time:'วันนี้ 13:05',text:'ส่งใน Google Classroom ตรงนี้ https://classroom.google.com/c/example123 ก่อน 23.59 นะ',photos:[]}];
+ent(-1,'m').comments=[{seat:8,time:'เมื่อวาน 18:02',text:'ข้อ 7 ครูบอกว่าข้ามได้ครับ',photos:[]}];
 
-var state={date:TODAY,admin:null,student:null,editingId:null,pending:[],overMonths:3};
+var state={open:{},cpend:{},date:TODAY,admin:null,student:null,editingId:null,pending:[],overMonths:3};
 function load(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function save(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
 state.admin=load('mock-admin');
@@ -270,14 +285,41 @@ function renderToday(){
   var d=parse(TODAY);
   $('todayLabel').textContent='วัน'+DAYS[d.getDay()]+'ที่ '+fmt(TODAY);
 }
+/* escape first, then turn http(s) links into chips; ASCII-only URL chars so Thai text right after a link is not swallowed */
+function linkLabel(u){
+  var h=u.hostname.replace(/^www\./,'');
+  if(h==='classroom.google.com')return {i:'🎓',n:'Google Classroom'};
+  if(h==='canva.com'||h==='canva.link'||/\.canva\.com$/.test(h))return {i:'🎨',n:'Canva'};
+  if(h==='youtube.com'||h==='m.youtube.com'||h==='youtu.be')return {i:'▶',n:'YouTube'};
+  if(h==='docs.google.com'||h==='drive.google.com')return {i:'📄',n:'Google Docs/Drive'};
+  return {i:'🔗',n:h};
+}
+function linkify(text){
+  return esc(text).replace(/https?:\/\/[A-Za-z0-9\-._~:\/?#\[\]@!$&'()*+,;=%]+/g,function(m){
+    var tail='',mm=/[.,;:!?)']+$/.exec(m);
+    if(mm){tail=mm[0];m=m.slice(0,m.length-tail.length)}
+    var u;try{u=new URL(m.replace(/&amp;/g,'&'))}catch(e){return m+tail}
+    if(u.protocol!=='http:'&&u.protocol!=='https:')return m+tail;
+    var l=linkLabel(u);
+    return '<a class="lnk" href="'+m+'" target="_blank" rel="noopener noreferrer nofollow" title="'+m+'">'+l.i+' <b>'+esc(l.n)+'</b></a>'+tail;
+  });
+}
+function picsHtml(list){return list.length?'<div class="pics">'+list.map(function(u){return '<img class="zoom" data-zoom="1" src="'+u+'" alt="รูปแนบ">'}).join('')+'</div>':''}
+function cthumbs(id){
+  return (state.cpend[id]||[]).map(function(p,i){return '<div class="thumb"><img src="'+p.url+'" alt=""><span>ย่อแล้ว<small>'+kb(p.before)+' → '+kb(p.after)+'</small></span><button type="button" class="linkbtn" data-crm="'+id+':'+i+'" aria-label="เอารูปออก">✕</button></div>'}).join('');
+}
+function commentsHtml(e){
+  var list=e.comments.length?e.comments.map(function(c){return '<div class="cm"><header><b>เลขที่ '+c.seat+'</b> · '+esc(c.time)+'</header>'+(c.text?'<p>'+linkify(c.text)+'</p>':'')+picsHtml(c.photos)+'</div>'}).join(''):'<div class="empty" style="padding:14px">ยังไม่มีความคิดเห็น เป็นคนแรกได้เลย</div>';
+  return '<div class="cmts">'+list+'<form class="cform" data-id="'+e.id+'"><label for="cc-'+e.id+'">รหัสนักเรียน</label><input type="text" id="cc-'+e.id+'" class="ccode" inputmode="numeric" autocomplete="off" placeholder="เช่น 10112" value="'+esc(state.student||'')+'"><label for="ct-'+e.id+'">ความคิดเห็น</label><textarea id="ct-'+e.id+'" class="ctext" placeholder="ถามเพื่อน ตอบเพื่อน หรือวางลิงก์ (Classroom / Canva / YouTube)"></textarea><label for="cf-'+e.id+'">แนบรูป (ไม่เกิน 2 รูป)</label><input type="file" id="cf-'+e.id+'" class="cfile" accept="image/*" multiple><div class="thumbs cthumbs">'+cthumbs(e.id)+'</div><p class="err cerr" role="alert"></p><button class="btn" type="submit">โพสต์ความคิดเห็น</button></form></div>';
+}
 function cardHtml(e){
   var s=subj(e.sid);
   var tools=state.admin?'<div class="tools"><button type="button" data-edit="'+e.id+'" aria-label="แก้ไข" title="แก้ไข">✎</button><button type="button" data-del="'+e.id+'" aria-label="ลบ" title="ลบ">🗑</button></div>':'';
-  var pics=e.photos.length?'<div class="pics">'+e.photos.map(function(u){return '<img src="'+u+'" alt="รูปแนบ">'}).join('')+'</div>':'';
+  var pics=e.photos.length?picsHtml(e.photos):'';
   var hw=e.hw
-    ?'<div class="chips"><span class="chip">⚠ มีการบ้าน</span><span class="chip due">📅 ส่ง: '+fmt(e.due)+'</span></div><p><b>🎯 โจทย์การบ้าน:</b> '+esc(e.detail)+'</p>'
+    ?'<div class="chips"><span class="chip">⚠ มีการบ้าน</span><span class="chip due">📅 ส่ง: '+fmt(e.due)+'</span></div><p><b>🎯 โจทย์การบ้าน:</b> '+linkify(e.detail)+'</p>'
     :'<div class="nohw">✓ ไม่มีการบ้าน</div>';
-  return '<article class="card'+(e.hw?' hw':'')+'">'+tools+'<h3>'+esc(s.code+' '+s.name)+'</h3><p><b>📝 งานในคาบ:</b> '+esc(e.lesson)+'</p>'+pics+hw+'<div class="byline">บันทึกโดย '+esc(e.author)+'</div></article>';
+  return '<article class="card'+(e.hw?' hw':'')+'">'+tools+'<h3>'+esc(s.code+' '+s.name)+'</h3><p><b>📝 งานในคาบ:</b> '+linkify(e.lesson)+'</p>'+pics+hw+'<div class="byline">บันทึกโดย '+esc(e.author)+'</div><button class="cbtn" type="button" data-ctoggle="'+e.id+'" aria-expanded="'+(state.open[e.id]?'true':'false')+'">💬 '+e.comments.length+' <span>ความคิดเห็น</span><i>'+(state.open[e.id]?'▾ ย่อ':'▸ อ่าน / เขียน')+'</i></button>'+(state.open[e.id]?commentsHtml(e):'')+'</article>';
 }
 function renderCards(){
   $('pickDate').value=state.date;
@@ -286,7 +328,7 @@ function renderCards(){
 }
 function itemHtml(e,late){
   var s=subj(e.sid);
-  return '<div class="item"><div><b>'+esc(s.code+' '+s.name)+'</b><p>'+esc(e.detail)+'</p><span class="byline">ส่ง '+fmt(e.due)+'</span></div><span class="chip '+(late?'late':'due')+'">'+relDue(e.due)+'</span></div>';
+  return '<div class="item"><div><b>'+esc(s.code+' '+s.name)+'</b><p>'+linkify(e.detail)+'</p><span class="byline">ส่ง '+fmt(e.due)+'</span></div><span class="chip '+(late?'late':'due')+'">'+relDue(e.due)+'</span></div>';
 }
 function renderUpcoming(){
   var list=entries.filter(function(e){return e.hw&&e.due>=TODAY}).sort(function(a,b){return a.due<b.due?-1:a.due>b.due?1:0});
@@ -306,10 +348,7 @@ function renderOverdue(){
   if(order.length>shown.length)html+='<button class="btn alt more" id="moreMonths" type="button">ดูเดือนก่อนหน้า ('+(order.length-shown.length)+' เดือน)</button>';
   $('overBody').innerHTML=html;
 }
-function renderNotes(){
-  $('notes').innerHTML=notes.map(function(n){return '<div class="note"><header><b>เลขที่ '+n.seat+'</b> · '+esc(n.time)+'</header><p>'+esc(n.text)+'</p></div>'}).join('');
-}
-function renderAll(){renderToday();renderCards();renderUpcoming();renderOverdue();renderNotes()}
+function renderAll(){renderToday();renderCards();renderUpcoming();renderOverdue()}
 
 /* ---------- form ---------- */
 function fillSubjects(){
@@ -413,7 +452,10 @@ $('nextDay').addEventListener('click',function(){state.date=addDays(state.date,1
 $('goToday').addEventListener('click',function(){state.date=TODAY;renderCards()});
 var delTimer;
 $('cards').addEventListener('click',function(ev){
-  var ed=ev.target.closest('[data-edit]'),dl=ev.target.closest('[data-del]');
+  var t=ev.target,ed=t.closest('[data-edit]'),dl=t.closest('[data-del]'),ct=t.closest('[data-ctoggle]'),z=t.closest('[data-zoom]'),rm=t.closest('[data-crm]');
+  if(ct){var id=ct.getAttribute('data-ctoggle');state.open[id]=!state.open[id];renderCards();return}
+  if(z){$('lbimg').src=z.src;$('lb').hidden=false;return}
+  if(rm){var q=rm.getAttribute('data-crm').split(':');state.cpend[q[0]].splice(Number(q[1]),1);rm.closest('.cthumbs').innerHTML=cthumbs(q[0]);return}
   if(ed){
     var e=entries.filter(function(x){return x.id===Number(ed.getAttribute('data-edit'))})[0];
     openPanel(true);state.editingId=null;$('fdate').value=e.date;$('fsubject').value=e.sid;syncForm();
@@ -427,25 +469,34 @@ $('cards').addEventListener('click',function(ev){
     }
   }
 });
+$('cards').addEventListener('change',async function(ev){
+  if(!ev.target.classList.contains('cfile'))return;
+  var form=ev.target.closest('form'),id=form.getAttribute('data-id'),files=Array.prototype.slice.call(ev.target.files);
+  ev.target.value='';var err=form.querySelector('.cerr');err.textContent='';
+  var list=state.cpend[id]=state.cpend[id]||[];
+  for(var i=0;i<files.length;i++){
+    if(list.length>=2){err.textContent='แนบได้ไม่เกิน 2 รูป';break}
+    try{list.push(await shrink(files[i]))}catch(e){err.textContent='เครื่องนี้อ่านรูป '+files[i].name+' ไม่ได้ ลองเลือกรูปอื่น'}
+  }
+  form.querySelector('.cthumbs').innerHTML=cthumbs(id);
+});
+$('cards').addEventListener('submit',function(ev){
+  var form=ev.target;if(!form.classList.contains('cform'))return;
+  ev.preventDefault();
+  var id=form.getAttribute('data-id'),c=form.querySelector('.ccode').value.trim(),t=form.querySelector('.ctext').value.trim(),err=form.querySelector('.cerr');
+  var photos=(state.cpend[id]||[]).map(function(p){return p.url});
+  if(!/^101(0[1-9]|[12]\d|30)$/.test(c)){err.textContent='ไม่พบรหัสนักเรียนนี้ในห้อง (ตัวอย่าง: 10101–10130)';return}
+  if(!t&&!photos.length){err.textContent='กรุณาเขียนข้อความหรือแนบรูป';return}
+  var e=entries.filter(function(x){return x.id===Number(id)})[0],now=new Date();
+  state.student=c;save('mock-student',c);
+  e.comments.push({seat:Number(c.slice(3)),time:'ตอนนี้ '+pad(now.getHours())+':'+pad(now.getMinutes()),text:t,photos:photos});
+  state.cpend[id]=[];renderCards();toast('โพสต์แล้ว · เลขที่ '+Number(c.slice(3)));
+});
+$('lb').addEventListener('click',function(){$('lb').hidden=true});
+document.addEventListener('keydown',function(ev){if(ev.key==='Escape')$('lb').hidden=true});
 $('overBody').addEventListener('click',function(ev){
   if(ev.target.id==='moreMonths'){state.overMonths+=3;renderOverdue()}
 });
-$('noteToggle').addEventListener('click',function(){
-  var open=$('noteForm').hidden;$('noteForm').hidden=!open;
-  $('noteToggle').setAttribute('aria-expanded',open?'true':'false');
-  if(open){if(state.student)$('ncode').value=state.student;($('ncode').value?$('ntext'):$('ncode')).focus()}
-});
-$('noteForm').addEventListener('submit',function(ev){
-  ev.preventDefault();
-  var c=$('ncode').value.trim(),t=$('ntext').value.trim();
-  if(!/^101(0[1-9]|[12]\d|30)$/.test(c)){$('nerr').textContent='ไม่พบรหัสนักเรียนนี้ในห้อง (ตัวอย่าง: 10101–10130)';return}
-  if(!t){$('nerr').textContent='กรุณาเขียนข้อความ';return}
-  $('nerr').textContent='';state.student=c;save('mock-student',c);
-  var now=new Date();
-  notes.unshift({seat:Number(c.slice(3)),time:'ตอนนี้ '+pad(now.getHours())+':'+pad(now.getMinutes()),text:t});
-  $('ntext').value='';renderNotes();toast('โพสต์แล้ว · เลขที่ '+Number(c.slice(3)));
-});
-
 /* ---------- init ---------- */
 fillSubjects();$('fdate').value=TODAY;renderAll();
 })();
