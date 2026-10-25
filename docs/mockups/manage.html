@@ -105,17 +105,17 @@ textarea{min-height:96px;resize:vertical}
 
   <section id="gate">
     <h2>หน้านี้สำหรับแอดมินห้อง</h2>
-    <label for="gname">ชื่อผู้บันทึก</label>
-    <input type="text" id="gname" autocomplete="off" placeholder="เช่น แม่น้องมาย / ครูต้น">
-    <label for="gpin">รหัสแอดมินห้อง</label>
-    <input type="password" id="gpin" autocomplete="off" inputmode="numeric">
-    <p class="hint">ตัวอย่างนี้ใช้รหัส <b>1234</b> · ถ้าเคยกรอกบนเครื่องนี้แล้วจะเข้าหน้านี้ได้ทันที</p>
+    <label for="gname">ชื่อผู้ใช้ (user name)</label>
+    <input type="text" id="gname" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="เช่น mai">
+    <label for="gpin">รหัสผ่าน</label>
+    <input type="password" id="gpin" autocomplete="current-password">
+    <p class="hint">ตัวอย่างนี้ใช้ชื่อผู้ใช้ <b>mai</b> รหัสผ่าน <b>mai12345</b> (หรือ <b>ton</b> / <b>ton12345</b>) · กรอกครั้งเดียว ระบบจะจำเครื่องนี้ไว้ ไม่ต้องกรอกอีก · ชื่อผู้ใช้และรหัสผ่านขอได้จากผู้ดูแลระบบ</p>
     <p class="err" id="gerr" role="alert"></p>
     <button class="btn" id="ggo" type="button">เข้าสู่หน้าจัดการ</button>
   </section>
 
   <div id="app" hidden>
-    <div class="who"><span>บันทึกโดย: <b id="whoName"></b></span><button class="linkbtn" id="notme" type="button">ไม่ใช่ฉัน?</button></div>
+    <div class="who"><span>บันทึกโดย: <b id="whoName"></b></span><button class="linkbtn" id="notme" type="button">ออกจากระบบ</button></div>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="t-subjects" aria-selected="true" aria-controls="p-subjects" type="button">📚 วิชา</button>
       <button class="tab" role="tab" id="t-students" aria-selected="false" aria-controls="p-students" type="button">🧒 นักเรียน</button>
@@ -188,17 +188,12 @@ textarea{min-height:96px;resize:vertical}
         <button class="btn" type="submit">สร้างภาคเรียน</button>
       </form>
 
-      <form class="card" id="pinForm">
-        <h2>เปลี่ยนรหัสแอดมินห้อง</h2>
-        <p class="hint" style="margin-top:2px">รหัสปัจจุบัน: เวอร์ชัน <b id="pinVer">1</b></p>
-        <label for="npin">รหัสใหม่ (ตัวเลข 4–8 หลัก)</label>
-        <input type="password" id="npin" autocomplete="new-password" inputmode="numeric">
-        <label for="npin2">พิมพ์รหัสใหม่อีกครั้ง</label>
-        <input type="password" id="npin2" autocomplete="new-password" inputmode="numeric">
-        <div class="warn">เมื่อเปลี่ยนรหัส แอดมินคนอื่นทุกเครื่องต้องกรอกรหัสใหม่ก่อนบันทึกได้ ใช้เมื่อรหัสหลุดหรือมีแอดมินคนเก่าออกไป (เครื่องนี้ไม่ต้องกรอกใหม่)</div>
-        <p class="err" id="perr" role="alert"></p>
-        <button class="btn" type="submit">เปลี่ยนรหัส</button>
-      </form>
+      <div class="card">
+        <h2>แอดมินห้อง</h2>
+        <p class="hint" style="margin-top:2px">คนที่ล็อกอินบันทึกข้อมูลของห้องนี้ได้ ชื่อที่แสดง (display) จะขึ้นเป็นผู้บันทึกบนการ์ด</p>
+        <ul class="list" id="admList"></ul>
+        <div class="warn">เพิ่มแอดมิน ตั้งรหัสผ่านใหม่ หรือปิดใช้งาน ให้ติดต่อผู้ดูแลระบบ (super admin) แอดมินห้องไม่สามารถเปลี่ยนรหัสผ่านเองได้</div>
+      </div>
 
       <div class="card">
         <h2>ที่ซ่อนไว้ <span class="pill" id="hidCount"></span></h2>
@@ -212,7 +207,7 @@ textarea{min-height:96px;resize:vertical}
 
 <script>
 (function(){
-var PIN='1234';
+var ADMINS=[{u:'mai',pw:'mai12345',display:'แม่น้องมาย'},{u:'ton',pw:'ton12345',display:'ครูต้น'}];
 var $=function(id){return document.getElementById(id)};
 function esc(t){var d=document.createElement('div');d.textContent=t==null?'':String(t);return d.innerHTML}
 function load(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -259,10 +254,10 @@ function showGate(){
   if(ok){$('whoName').textContent=st.admin;renderAll()}
 }
 $('ggo').addEventListener('click',function(){
-  var n=$('gname').value.trim(),p=$('gpin').value.trim();
-  if(!n){$('gerr').textContent='กรุณากรอกชื่อผู้บันทึก';return}
-  if(p!==PIN){$('gerr').textContent='รหัสแอดมินห้องไม่ถูกต้อง ลองใหม่อีกครั้ง';return}
-  $('gerr').textContent='';st.admin=n;save('mock-admin',n);$('gpin').value='';showGate();toast('ยินดีต้อนรับ '+n);
+  var u=$('gname').value.trim().toLowerCase(),p=$('gpin').value;
+  var a=ADMINS.filter(function(x){return x.u===u&&x.pw===p})[0];
+  if(!a){$('gerr').textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง ลองใหม่อีกครั้ง (ลืมรหัสผ่านให้ติดต่อผู้ดูแลระบบ)';return}
+  $('gerr').textContent='';st.admin=a.display;save('mock-admin',a.display);$('gpin').value='';showGate();toast('ยินดีต้อนรับ '+a.display);
 });
 $('notme').addEventListener('click',function(){st.admin=null;save('mock-admin',null);showGate();$('gname').focus()});
 $('back').addEventListener('click',function(){toast('ในระบบจริง ปุ่มนี้พากลับหน้าหลักของห้อง')});
@@ -388,7 +383,17 @@ $('stForm').addEventListener('submit',function(ev){
 });
 
 /* ---------- settings ---------- */
-function renderTitle(){$('title').textContent='จัดการห้อง '+curTerm().label;$('pinVer').textContent=cls.pinVersion}
+function renderTitle(){$('title').textContent='จัดการห้อง '+curTerm().label}
+var roomAdmins=[
+ {display:'แม่น้องมาย',username:'mai',active:true,last:'วันนี้ 14:02'},
+ {display:'ครูต้น',username:'ton',active:true,last:'เมื่อวาน 18:40'},
+ {display:'พ่อน้องบอส',username:'boss',active:false,last:'ปิดใช้งานแล้ว'}
+];
+function renderAdmins(){
+  $('admList').innerHTML=roomAdmins.map(function(a){
+    return '<li class="row'+(a.active?'':' off')+'"><div class="rmain"><b>'+esc(a.display)+'</b> <span class="pill" style="margin:0">@'+esc(a.username)+'</span>'+(a.active?'':'<span class="pill">ปิดใช้งาน</span>')+'<small>ใช้ล่าสุด: '+esc(a.last)+(a.display===st.admin?' · นี่คือคุณ':'')+'</small></div></li>';
+  }).join('');
+}
 function validTerm(o,selfId){
   if(!o.name||!o.label)return 'กรุณากรอกชื่อภาคเรียนและชื่อห้อง';
   if(!o.start||!o.end)return 'กรุณาเลือกวันเปิดและปิดเทอม';
@@ -435,13 +440,6 @@ $('termForm').addEventListener('submit',function(ev){
   $('tnm').value='';$('tst').value='';$('ten').value='';renderTerms();renderTitle();prefillTerm();
   toast('สร้าง '+o.name+' แล้ว'+($('tcur').checked?' · เป็นภาคเรียนปัจจุบัน':''));
 });
-$('pinForm').addEventListener('submit',function(ev){
-  ev.preventDefault();var a=$('npin').value.trim(),b=$('npin2').value.trim();
-  if(!/^\d{4,8}$/.test(a)){$('perr').textContent='รหัสต้องเป็นตัวเลข 4–8 หลัก';return}
-  if(a!==b){$('perr').textContent='รหัสสองช่องไม่ตรงกัน';return}
-  $('perr').textContent='';PIN=a;cls.pinVersion++;$('npin').value='';$('npin2').value='';
-  renderTitle();toast('เปลี่ยนรหัสแล้ว · แอดมินเครื่องอื่นต้องกรอกรหัสใหม่');
-});
 function renderHidden(){
   $('hidCount').textContent=hidden.length;
   $('hidList').innerHTML=hidden.length?hidden.map(function(h){
@@ -453,7 +451,7 @@ $('hidList').addEventListener('click',function(ev){
   var id=+b.getAttribute('data-restore');hidden=hidden.filter(function(h){return h.id!==id});renderHidden();toast('กู้คืนแล้ว');
 });
 
-function renderAll(){renderTitle();renderTerms();prefillTerm();renderSubjects();renderStudents();renderHidden()}
+function renderAll(){renderTitle();renderAdmins();renderTerms();prefillTerm();renderSubjects();renderStudents();renderHidden()}
 showGate();
 })();
 </script>

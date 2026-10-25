@@ -82,6 +82,13 @@ input[type=text],input[type=date]{width:100%;min-height:46px;font-size:16px;back
 .urlprev{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;color:var(--muted);margin:6px 0 0;overflow-wrap:anywhere}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .chip{background:var(--panel);border-radius:99px;padding:3px 12px;font-size:14px;overflow-wrap:anywhere}
+.alist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.arow{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.arow.off{opacity:.65}
+.amain{overflow-wrap:anywhere}
+.amain small{display:block;color:var(--muted);font-size:13px}
+.aform{margin-top:12px;border-top:1px dashed var(--line);padding-top:4px}
+.cred{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;font-weight:700;background:var(--surface);border:1.5px dashed var(--ink);border-radius:10px;padding:8px 12px;overflow-wrap:anywhere;user-select:all;margin-top:6px}
 .empty{border:1.5px dashed var(--line);border-radius:12px;padding:18px 12px;text-align:center;color:var(--muted)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:11px 20px;border-radius:99px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:20;max-width:calc(100% - 32px)}
 @media (min-width:561px){
@@ -128,9 +135,16 @@ input[type=text],input[type=date]{width:100%;min-height:46px;font-size:16px;back
         <div><label for="nst">วันเปิดเทอม</label><input type="date" id="nst"></div>
         <div><label for="nen">วันปิดเทอม</label><input type="date" id="nen"></div>
       </div>
-      <label for="npin">รหัสแอดมินห้องเริ่มต้น (ตัวเลข 4–8 หลัก)</label>
-      <div class="pinrow"><input type="text" id="npin" inputmode="numeric" autocomplete="off"><button class="sbtn" id="nrand" type="button">🎲 สุ่ม</button></div>
-      <p class="hint">รหัสนี้แจ้งให้แอดมินห้อง ระบบเก็บเฉพาะค่าที่เข้ารหัสแล้ว หลังสร้างจะแสดงให้ดูครั้งเดียว</p>
+      <h3 style="margin-top:18px">แอดมินห้องคนแรก</h3>
+      <label for="ndisp">ชื่อที่แสดง (display)</label>
+      <input type="text" id="ndisp" autocomplete="off" placeholder="เช่น แม่น้องมาย">
+      <p class="hint">แสดงเป็นผู้บันทึกบนการ์ดในหน้าหลัก</p>
+      <label for="nuser">ชื่อผู้ใช้ (user name)</label>
+      <input type="text" id="nuser" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="เช่น mai">
+      <p class="hint">ใช้ล็อกอินตอนบันทึกข้อมูล · a–z 0–9 จุด ขีดกลาง ขีดล่าง 3–20 ตัว</p>
+      <label for="npw">รหัสผ่าน</label>
+      <div class="pinrow"><input type="text" id="npw" autocomplete="off" autocapitalize="none" spellcheck="false"><button class="sbtn" id="nrand" type="button">🎲 สุ่ม</button></div>
+      <p class="hint">ตั้งอิสระได้ ใช้ตัวอักษร ตัวเลข หรือสัญลักษณ์อะไรก็ได้ ยาว 8–128 ตัว (แนะนำให้ใช้ที่ระบบสุ่ม) ระบบเก็บเฉพาะค่าที่เข้ารหัสแล้ว หลังสร้างจะแสดงให้ดูครั้งเดียว แล้วแจ้งแอดมินห้อง</p>
       <p class="err" id="nerr" role="alert"></p>
       <button class="btn" type="submit">สร้างห้อง</button>
     </form>
@@ -162,89 +176,128 @@ function iso(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate
 function addDays(s,n){var p=s.split('-').map(Number),d=new Date(p[0],p[1]-1,p[2]);d.setDate(d.getDate()+n);return iso(d)}
 var TODAY=iso(new Date());
 var toastTimer;
-function toast(t){var el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.hidden=true},2800)}
-function genPin(){var a=new Uint32Array(1);(window.crypto||{getRandomValues:function(x){x[0]=Math.floor(Math.random()*4294967295)}}).getRandomValues(a);return String(100000+a[0]%900000)}
+function toast(t){var el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.hidden=true},3000)}
+var ALPHA='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function genPw(){var a=new Uint32Array(10);if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(a);else for(var i=0;i<10;i++)a[i]=Math.floor(Math.random()*4294967295);var o='';for(var j=0;j<10;j++)o+=ALPHA[a[j]%ALPHA.length];return o}
+function copy(text,ok){try{navigator.clipboard.writeText(text).then(function(){toast(ok)},function(){toast('คัดลอกไม่ได้ ให้จดไว้เอง')})}catch(e){toast('คัดลอกไม่ได้ ให้จดไว้เอง')}}
 
 var Y=new Date().getFullYear();
-var uid=10;
+var uid=20;
 var rooms=[
- {id:1,slug:'p5-1',label:'ป.5/1',term:'ภาคเรียนที่ 2/'+Y,students:29,entries:312,pinV:3,active:true},
- {id:2,slug:'p5-2',label:'ป.5/2',term:'ภาคเรียนที่ 2/'+Y,students:31,entries:268,pinV:1,active:true},
- {id:3,slug:'m1-3',label:'ม.1/3 (ปีที่แล้ว)',term:'ภาคเรียนที่ 2/'+(Y-1),students:34,entries:540,pinV:2,active:false}
+ {id:1,slug:'p5-1',label:'ป.5/1',term:'ภาคเรียนที่ 2/'+Y,students:29,entries:312,active:true,admins:[
+   {id:1,display:'แม่น้องมาย',username:'mai',active:true,posts:180},
+   {id:2,display:'ครูต้น',username:'ton',active:true,posts:132}]},
+ {id:2,slug:'p5-2',label:'ป.5/2',term:'ภาคเรียนที่ 2/'+Y,students:31,entries:268,active:true,admins:[
+   {id:3,display:'พ่อน้องบอส',username:'boss',active:true,posts:268}]},
+ {id:3,slug:'m1-3',label:'ม.1/3 (ปีที่แล้ว)',term:'ภาคเรียนที่ 2/'+(Y-1),students:34,entries:540,active:false,admins:[
+   {id:4,display:'ครูหญิง',username:'ying',active:false,posts:540}]}
 ];
-var ui={pin:null,reveal:{},fresh:null};
+var ui={open:null,reset:null,reveal:null,fresh:null};
+function find(id){return rooms.filter(function(r){return r.id===id})[0]}
+function findAdmin(r,id){return r.admins.filter(function(a){return a.id===id})[0]}
 
+function adminPanel(r){
+  var rows=r.admins.length?r.admins.map(function(a){
+    var reset='';
+    if(ui.reset&&ui.reset.aid===a.id){
+      reset='<div class="pinrow" style="margin-top:6px"><input type="text" id="rp-'+a.id+'" value="'+esc(ui.reset.pw)+'" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="รหัสผ่านใหม่"><button class="sbtn" type="button" data-rrand="'+a.id+'">🎲</button></div><p class="err" id="re-'+a.id+'" role="alert"></p><div class="tools"><button class="sbtn" type="button" data-rsave="'+a.id+'" style="background:var(--ink);color:var(--accent)">ตั้งรหัสผ่านใหม่</button><button class="sbtn" type="button" data-rcancel="1">ยกเลิก</button></div>';
+    }
+    var del=a.posts===0
+      ?'<button class="sbtn" type="button" data-adel="'+a.id+'" aria-label="ลบแอดมิน">🗑</button>'
+      :'<button class="sbtn" type="button" disabled title="ลบไม่ได้ เพราะเคยบันทึกข้อมูลแล้ว ให้ปิดใช้งานแทน" aria-label="ลบไม่ได้ เพราะเคยบันทึกข้อมูลแล้ว">🗑</button>';
+    return '<li class="arow'+(a.active?'':' off')+'"><div class="amain"><b>'+esc(a.display)+'</b> <span class="url">@'+esc(a.username)+'</span>'+(a.active?'':' <span class="pill">ปิดใช้งาน</span>')+'<small>บันทึกไปแล้ว '+a.posts+' ครั้ง</small></div>'
+      +(ui.reset&&ui.reset.aid===a.id?reset:'<div class="tools"><button class="sbtn" type="button" data-areset="'+a.id+'">ตั้งรหัสผ่านใหม่</button><button class="sbtn" type="button" data-atoggle="'+a.id+'">'+(a.active?'ปิดใช้งาน':'เปิดใช้งาน')+'</button>'+del+'</div>')
+      +'</li>';
+  }).join(''):'<li class="empty">ยังไม่มีแอดมินห้อง เพิ่มคนแรกด้านล่าง</li>';
+  var cred='';
+  if(ui.reveal&&ui.reveal.rid===r.id){
+    cred='<div class="warn"><b>ข้อมูลล็อกอินของ '+esc(ui.reveal.display)+'</b> <small>(แสดงครั้งเดียว)</small><div class="cred">ชื่อผู้ใช้: '+esc(ui.reveal.username)+'<br>รหัสผ่าน: '+esc(ui.reveal.pw)+'</div><div class="tools" style="margin-top:8px"><button class="sbtn" type="button" data-copycred="1">คัดลอก</button><button class="sbtn" type="button" data-hidecred="1">เสร็จแล้ว</button></div><p class="hint">จดหรือส่งให้แอดมินก่อนกด "เสร็จแล้ว" ปิดแล้วดูรหัสผ่านซ้ำไม่ได้ (ลืมให้ตั้งรหัสผ่านใหม่) แอดมินที่ล็อกอินค้างอยู่จะถูกออกจากระบบ</p></div>';
+  }
+  return '<div class="pinbox"><b>แอดมินห้อง ('+r.admins.length+')</b><ul class="alist">'+rows+'</ul>'+cred
+    +'<form class="aform" data-rid="'+r.id+'"><label for="ad-'+r.id+'">เพิ่มแอดมิน · ชื่อที่แสดง</label><input type="text" id="ad-'+r.id+'" autocomplete="off" placeholder="เช่น ครูต้น"><label for="au-'+r.id+'">ชื่อผู้ใช้</label><input type="text" id="au-'+r.id+'" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="เช่น ton"><label for="ap-'+r.id+'">รหัสผ่าน (ตั้งอิสระ 8–128 ตัว)</label><div class="pinrow"><input type="text" id="ap-'+r.id+'" value="'+genPw()+'" autocomplete="off" autocapitalize="none" spellcheck="false"><button class="sbtn" type="button" data-arand="'+r.id+'">🎲</button></div><p class="err" id="ae-'+r.id+'" role="alert"></p><button class="btn" type="submit" style="margin-top:6px">เพิ่มแอดมิน</button></form></div>';
+}
 function render(){
   $('sAll').textContent=rooms.length;
   $('sOn').textContent=rooms.filter(function(r){return r.active}).length;
   $('rooms').innerHTML=rooms.length?rooms.map(function(r){
-    var empty=r.entries===0;
-    var pinPanel='';
-    if(ui.reveal[r.id]){
-      pinPanel='<div class="pinbox"><div>รหัสแอดมินห้องใหม่ <small class="hint">(แสดงครั้งเดียว)</small></div><div class="row" style="margin-top:6px"><span class="pinval">'+esc(ui.reveal[r.id])+'</span><button class="sbtn" type="button" data-copy="'+r.id+'">คัดลอก</button><button class="sbtn" type="button" data-hide="'+r.id+'">เสร็จแล้ว</button></div><p class="hint">จดหรือส่งให้แอดมินห้องก่อนกด "เสร็จแล้ว" ปิดแล้วดูซ้ำไม่ได้ (ลืมให้ตั้งรหัสใหม่) แอดมินที่ใช้รหัสเก่าต้องกรอกรหัสใหม่</p></div>';
-    }else if(ui.pin===r.id){
-      pinPanel='<div class="pinbox"><label for="pp-'+r.id+'" style="margin-top:0">รหัสใหม่ (ตัวเลข 4–8 หลัก)</label><div class="pinrow"><input type="text" id="pp-'+r.id+'" inputmode="numeric" autocomplete="off" value="'+genPin()+'"><button class="sbtn" type="button" data-rand="'+r.id+'">🎲 สุ่ม</button></div><p class="err" id="pe-'+r.id+'" role="alert"></p><div class="tools"><button class="sbtn" type="button" data-pinsave="'+r.id+'" style="background:var(--ink);color:var(--accent)">ตั้งรหัสใหม่</button><button class="sbtn" type="button" data-pincancel="1">ยกเลิก</button></div></div>';
-    }
+    var empty=r.entries===0,on=r.admins.filter(function(a){return a.active}).length;
     return '<li class="room'+(r.active?'':' off')+(ui.fresh===r.id?' fresh':'')+'">'
       +'<div class="top"><h3>'+esc(r.label)+'</h3><span class="pill'+(r.active?' on':'')+'">'+(r.active?'เปิดใช้งาน':'ปิดอยู่ (อ่านอย่างเดียว)')+'</span></div>'
       +'<div class="url">/c/'+esc(r.slug)+'</div>'
-      +'<div class="meta"><span>'+esc(r.term)+'</span><span>นักเรียน <b>'+r.students+'</b></span><span>บันทึก <b>'+r.entries+'</b></span><span>รหัสแอดมิน เวอร์ชัน <b>'+r.pinV+'</b></span></div>'
-      +pinPanel
-      +'<div class="tools"><button class="sbtn" type="button" data-open="'+r.id+'">จัดการห้อง →</button><button class="sbtn" type="button" data-link="'+r.id+'">คัดลอกลิงก์</button><button class="sbtn" type="button" data-pin="'+r.id+'">ตั้งรหัสแอดมินใหม่</button><button class="sbtn" type="button" data-active="'+r.id+'">'+(r.active?'ปิดห้อง':'เปิดห้องอีกครั้ง')+'</button>'
+      +'<div class="meta"><span>'+esc(r.term)+'</span><span>นักเรียน <b>'+r.students+'</b></span><span>บันทึก <b>'+r.entries+'</b></span><span>แอดมิน <b>'+on+'</b>/'+r.admins.length+'</span></div>'
+      +(ui.open===r.id?adminPanel(r):'')
+      +'<div class="tools"><button class="sbtn" type="button" data-open="'+r.id+'">จัดการห้อง →</button><button class="sbtn" type="button" data-link="'+r.id+'">คัดลอกลิงก์</button><button class="sbtn" type="button" data-admins="'+r.id+'" aria-expanded="'+(ui.open===r.id?'true':'false')+'">👤 แอดมินห้อง</button><button class="sbtn" type="button" data-active="'+r.id+'">'+(r.active?'ปิดห้อง':'เปิดห้องอีกครั้ง')+'</button>'
       +(empty?'<button class="sbtn" type="button" data-del="'+r.id+'" aria-label="ลบห้อง">🗑 ลบ</button>':'<button class="sbtn" type="button" disabled title="ลบไม่ได้ เพราะมีข้อมูลแล้ว ให้ปิดห้องแทน" aria-label="ลบไม่ได้ เพราะมีข้อมูลแล้ว">🗑</button>')
       +'</div></li>';
   }).join(''):'<li class="empty">ยังไม่มีห้อง สร้างห้องแรกด้านล่าง</li>';
 }
-function find(id){return rooms.filter(function(r){return r.id===id})[0]}
+var USER_RE=/^[a-z0-9._-]{3,20}$/;
+function validAdmin(r,display,username,pw){
+  if(!display||display.length>30)return 'กรุณากรอกชื่อที่แสดง (ไม่เกิน 30 ตัวอักษร)';
+  if(!USER_RE.test(username))return 'ชื่อผู้ใช้ใช้ได้เฉพาะ a–z 0–9 จุด ขีดกลาง ขีดล่าง 3–20 ตัว';
+  if(r&&r.admins.some(function(a){return a.username===username}))return 'ชื่อผู้ใช้ @'+username+' ถูกใช้แล้วในห้องนี้';
+  if(pw.length<8||pw.length>128)return 'รหัสผ่านต้องยาว 8–128 ตัว';
+  return '';
+}
 var delTimer;
 $('rooms').addEventListener('click',function(ev){
   var t=ev.target,b,r;
-  if((b=t.closest('[data-open]'))){toast('ในระบบจริง เข้าหน้าจัดการของห้อง '+find(+b.getAttribute('data-open')).label+' ได้เลยโดยไม่ต้องกรอกรหัสแอดมิน');return}
-  if((b=t.closest('[data-link]'))){
-    r=find(+b.getAttribute('data-link'));
-    try{navigator.clipboard.writeText('/c/'+r.slug).then(function(){toast('คัดลอกลิงก์ /c/'+r.slug+' แล้ว')},function(){toast('คัดลอกไม่ได้ ให้จดลิงก์ /c/'+r.slug)})}catch(e){toast('คัดลอกไม่ได้ ให้จดลิงก์ /c/'+r.slug)}
+  if((b=t.closest('[data-open]'))){toast('ในระบบจริง เข้าหน้าจัดการของห้อง '+find(+b.getAttribute('data-open')).label+' ได้เลยโดยไม่ต้องล็อกอินแอดมินห้อง');return}
+  if((b=t.closest('[data-link]'))){r=find(+b.getAttribute('data-link'));copy('/c/'+r.slug,'คัดลอกลิงก์ /c/'+r.slug+' แล้ว');return}
+  if((b=t.closest('[data-admins]'))){var rid=+b.getAttribute('data-admins');ui.open=ui.open===rid?null:rid;ui.reset=null;if(ui.reveal&&ui.reveal.rid!==ui.open)ui.reveal=null;render();return}
+  if((b=t.closest('[data-areset]'))){ui.reset={aid:+b.getAttribute('data-areset'),pw:genPw()};ui.reveal=null;render();return}
+  if((b=t.closest('[data-rcancel]'))){ui.reset=null;render();return}
+  if((b=t.closest('[data-rrand]'))){$('rp-'+b.getAttribute('data-rrand')).value=genPw();return}
+  if((b=t.closest('[data-arand]'))){$('ap-'+b.getAttribute('data-arand')).value=genPw();return}
+  if((b=t.closest('[data-rsave]'))){
+    var aid=+b.getAttribute('data-rsave'),v=$('rp-'+aid).value;r=find(ui.open);
+    if(v.length<8||v.length>128){$('re-'+aid).textContent='รหัสผ่านต้องยาว 8–128 ตัว';return}
+    var a=findAdmin(r,aid);ui.reset=null;ui.reveal={rid:r.id,display:a.display,username:a.username,pw:v};render();toast('ตั้งรหัสผ่านใหม่ให้ '+a.display+' แล้ว · ออกจากระบบทุกเครื่องของแอดมินคนนี้');return}
+  if((b=t.closest('[data-atoggle]'))){r=find(ui.open);var a2=findAdmin(r,+b.getAttribute('data-atoggle'));a2.active=!a2.active;render();toast(a2.active?'เปิดใช้งาน '+a2.display+' แล้ว':'ปิดใช้งาน '+a2.display+' แล้ว ออกจากระบบทุกเครื่อง ข้อมูลที่เคยบันทึกยังอยู่');return}
+  if((b=t.closest('[data-adel]'))){
+    if(b.classList.contains('sure')){r=find(ui.open);r.admins=r.admins.filter(function(x){return x.id!==+b.getAttribute('data-adel')});render();toast('ลบแอดมินแล้ว')}
+    else{b.classList.add('sure');b.textContent='ยืนยันลบ?';clearTimeout(delTimer);delTimer=setTimeout(render,3000)}
     return}
-  if((b=t.closest('[data-pin]'))){ui.pin=+b.getAttribute('data-pin');render();return}
-  if((b=t.closest('[data-pincancel]'))){ui.pin=null;render();return}
-  if((b=t.closest('[data-rand]'))){$('pp-'+b.getAttribute('data-rand')).value=genPin();return}
-  if((b=t.closest('[data-pinsave]'))){
-    var id=+b.getAttribute('data-pinsave'),v=$('pp-'+id).value.trim();
-    if(!/^\d{4,8}$/.test(v)){$('pe-'+id).textContent='รหัสต้องเป็นตัวเลข 4–8 หลัก';return}
-    r=find(id);r.pinV++;ui.pin=null;ui.reveal[id]=v;render();toast('ตั้งรหัสแอดมินใหม่ให้ '+r.label+' แล้ว');return}
-  if((b=t.closest('[data-copy]'))){
-    var pv=ui.reveal[+b.getAttribute('data-copy')];
-    try{navigator.clipboard.writeText(pv).then(function(){toast('คัดลอกรหัสแล้ว')},function(){toast('คัดลอกไม่ได้ ให้จดรหัส '+pv)})}catch(e){toast('คัดลอกไม่ได้ ให้จดรหัส '+pv)}
-    return}
-  if((b=t.closest('[data-hide]'))){delete ui.reveal[+b.getAttribute('data-hide')];ui.fresh=null;render();return}
+  if((b=t.closest('[data-copycred]'))){copy('ชื่อผู้ใช้: '+ui.reveal.username+'\nรหัสผ่าน: '+ui.reveal.pw,'คัดลอกชื่อผู้ใช้และรหัสผ่านแล้ว');return}
+  if((b=t.closest('[data-hidecred]'))){ui.reveal=null;ui.fresh=null;render();return}
   if((b=t.closest('[data-active]'))){r=find(+b.getAttribute('data-active'));r.active=!r.active;render();toast(r.active?'เปิดห้อง '+r.label+' แล้ว':'ปิดห้อง '+r.label+' แล้ว ทุกคนอ่านได้ แต่โพสต์หรือแก้ไขไม่ได้');return}
   if((b=t.closest('[data-del]'))){
-    if(b.classList.contains('sure')){var id2=+b.getAttribute('data-del');rooms=rooms.filter(function(x){return x.id!==id2});render();toast('ลบห้องแล้ว')}
+    if(b.classList.contains('sure')){var id2=+b.getAttribute('data-del');rooms=rooms.filter(function(x){return x.id!==id2});if(ui.open===id2)ui.open=null;render();toast('ลบห้องแล้ว')}
     else{b.classList.add('sure');b.textContent='ยืนยันลบห้อง?';clearTimeout(delTimer);delTimer=setTimeout(render,3000)}
   }
+});
+$('rooms').addEventListener('submit',function(ev){
+  var f=ev.target;if(!f.classList.contains('aform'))return;ev.preventDefault();
+  var r=find(+f.getAttribute('data-rid')),id=r.id;
+  var d=$('ad-'+id).value.trim(),u=$('au-'+id).value.trim().toLowerCase(),pw=$('ap-'+id).value,e=validAdmin(r,d,u,pw);
+  $('ae-'+id).textContent=e;if(e)return;
+  r.admins.push({id:++uid,display:d,username:u,active:true,posts:0});ui.reveal={rid:id,display:d,username:u,pw:pw};ui.reset=null;
+  render();toast('เพิ่มแอดมิน '+d+' แล้ว · จดรหัสผ่านก่อนกด "เสร็จแล้ว"');
 });
 
 /* ---------- create room ---------- */
 function prefill(){
   if(!$('nst').value)$('nst').value=TODAY;
   if(!$('nen').value)$('nen').value=addDays($('nst').value,120);
-  if(!$('npin').value)$('npin').value=genPin();
+  if(!$('npw').value)$('npw').value=genPw();
 }
 $('nslug').addEventListener('input',function(){var v=$('nslug').value.trim().toLowerCase();$('nprev').textContent='/c/'+(v||'…')});
-$('nrand').addEventListener('click',function(){$('npin').value=genPin()});
+$('nrand').addEventListener('click',function(){$('npw').value=genPw()});
 $('newForm').addEventListener('submit',function(ev){
   ev.preventDefault();
-  var slug=$('nslug').value.trim().toLowerCase(),label=$('nlabel').value.trim(),term=$('nterm').value.trim(),st=$('nst').value,en=$('nen').value,pin=$('npin').value.trim();
+  var slug=$('nslug').value.trim().toLowerCase(),label=$('nlabel').value.trim(),term=$('nterm').value.trim(),st=$('nst').value,en=$('nen').value;
+  var d=$('ndisp').value.trim(),u=$('nuser').value.trim().toLowerCase(),pw=$('npw').value;
   var e='';
   if(!/^[a-z0-9](?:[a-z0-9-]{1,28})[a-z0-9]$/.test(slug))e='ชื่อลิงก์ใช้ได้เฉพาะตัวอักษรอังกฤษพิมพ์เล็ก ตัวเลข และขีด 3–30 ตัว (ไม่ขึ้นต้นหรือลงท้ายด้วยขีด)';
   else if(rooms.some(function(r){return r.slug===slug}))e='ชื่อลิงก์ /c/'+slug+' ถูกใช้แล้ว';
   else if(!label||!term)e='กรุณากรอกชื่อห้องและชื่อภาคเรียนแรก';
   else if(!st||!en||en<st)e='กรุณาเลือกวันเปิด–ปิดเทอมให้ถูกต้อง (วันปิดไม่ก่อนวันเปิด)';
-  else if(!/^\d{4,8}$/.test(pin))e='รหัสแอดมินห้องต้องเป็นตัวเลข 4–8 หลัก';
+  else e=validAdmin(null,d,u,pw);
   $('nerr').textContent=e;if(e)return;
-  var id=++uid;rooms.unshift({id:id,slug:slug,label:label,term:term,students:0,entries:0,pinV:1,active:true});
-  ui.reveal[id]=pin;ui.fresh=id;
-  $('nslug').value='';$('nlabel').value='';$('nterm').value='';$('nst').value='';$('nen').value='';$('npin').value='';$('nprev').textContent='/c/…';
-  prefill();render();toast('สร้างห้อง '+label+' แล้ว · จดรหัสแอดมินก่อนกด "เสร็จแล้ว"');
+  var id=++uid;rooms.unshift({id:id,slug:slug,label:label,term:term,students:0,entries:0,active:true,admins:[{id:++uid,display:d,username:u,active:true,posts:0}]});
+  ui.open=id;ui.reset=null;ui.reveal={rid:id,display:d,username:u,pw:pw};ui.fresh=id;
+  ['nslug','nlabel','nterm','nst','nen','ndisp','nuser','npw'].forEach(function(k){$(k).value=''});$('nprev').textContent='/c/…';
+  prefill();render();toast('สร้างห้อง '+label+' แล้ว · จดข้อมูลล็อกอินของแอดมินก่อนกด "เสร็จแล้ว"');
   $('rooms').scrollIntoView({behavior:'smooth',block:'start'});
 });
 $('bkNow').addEventListener('click',function(){var n=new Date();$('bk').textContent='วันนี้ '+pad(n.getHours())+':'+pad(n.getMinutes())+' (สั่งเอง)';toast('สำรองข้อมูลเรียบร้อย (ตัวอย่าง)')});

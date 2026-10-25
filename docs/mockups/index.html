@@ -151,17 +151,17 @@ input[type=file]{width:100%;max-width:100%;min-width:0;font-size:14px}
   <section class="panel" id="panel" hidden>
     <div id="identify">
       <h3>ก่อนบันทึก ขอทราบว่าคุณคือใคร</h3>
-      <label for="idname">ชื่อผู้บันทึก</label>
-      <input type="text" id="idname" autocomplete="off" placeholder="เช่น แม่น้องมาย / ครูต้น">
-      <label for="idpin">รหัสแอดมินห้อง</label>
-      <input type="password" id="idpin" autocomplete="off" inputmode="numeric">
-      <p class="hint">ตัวอย่างนี้ใช้รหัส <b>1234</b> · กรอกครั้งเดียว ระบบจะจำเครื่องนี้ไว้ ไม่ต้องกรอกอีก</p>
+      <label for="idname">ชื่อผู้ใช้ (user name)</label>
+      <input type="text" id="idname" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="เช่น mai">
+      <label for="idpin">รหัสผ่าน</label>
+      <input type="password" id="idpin" autocomplete="current-password">
+      <p class="hint">ตัวอย่างนี้ใช้ชื่อผู้ใช้ <b>mai</b> รหัสผ่าน <b>mai12345</b> (หรือ <b>ton</b> / <b>ton12345</b>) · กรอกครั้งเดียว ระบบจะจำเครื่องนี้ไว้ ไม่ต้องกรอกอีก · ชื่อผู้ใช้และรหัสผ่านขอได้จากผู้ดูแลระบบ</p>
       <p class="err" id="iderr" role="alert"></p>
       <button class="btn" id="idgo" type="button">ยืนยัน</button>
     </div>
 
     <form id="entryForm" hidden>
-      <div class="who"><span>บันทึกโดย: <b id="whoName"></b></span><button class="linkbtn" id="notme" type="button">ไม่ใช่ฉัน?</button></div>
+      <div class="who"><span>บันทึกโดย: <b id="whoName"></b></span><button class="linkbtn" id="notme" type="button">ออกจากระบบ</button></div>
       <h3 id="formTitle">ฟอร์มบันทึกข้อมูล</h3>
       <div class="note-edit" id="editNote" hidden>วิชานี้มีบันทึกของวันที่เลือกอยู่แล้ว กำลังแก้ไขของเดิม ไม่สร้างซ้ำ</div>
       <div class="row">
@@ -218,7 +218,7 @@ input[type=file]{width:100%;max-width:100%;min-width:0;font-size:14px}
 (function(){
 var MONTHS=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 var DAYS=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
-var PIN='1234';
+var ADMINS=[{u:'mai',pw:'mai12345',display:'แม่น้องมาย'},{u:'ton',pw:'ton12345',display:'ครูต้น'}];
 var $=function(id){return document.getElementById(id)};
 var pad=function(n){return String(n).padStart(2,'0')};
 var iso=function(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
@@ -439,11 +439,11 @@ async function shrink(file){
 /* ---------- events ---------- */
 $('toggle').addEventListener('click',function(){openPanel($('panel').hidden)});
 $('idgo').addEventListener('click',function(){
-  var n=$('idname').value.trim(),p=$('idpin').value.trim();
-  if(!n){$('iderr').textContent='กรุณากรอกชื่อผู้บันทึก';return}
-  if(p!==PIN){$('iderr').textContent='รหัสแอดมินห้องไม่ถูกต้อง ลองใหม่อีกครั้ง';return}
-  $('iderr').textContent='';state.admin=n;save('mock-admin',n);$('idpin').value='';
-  showPanelState();renderCards();toast('ยินดีต้อนรับ '+n+' · จำเครื่องนี้ไว้แล้ว');$('fsubject').focus();
+  var u=$('idname').value.trim().toLowerCase(),p=$('idpin').value;
+  var a=ADMINS.filter(function(x){return x.u===u&&x.pw===p})[0];
+  if(!a){$('iderr').textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง ลองใหม่อีกครั้ง (ลืมรหัสผ่านให้ติดต่อผู้ดูแลระบบ)';return}
+  $('iderr').textContent='';state.admin=a.display;save('mock-admin',a.display);$('idpin').value='';
+  showPanelState();renderCards();toast('ยินดีต้อนรับ '+a.display+' · จำเครื่องนี้ไว้แล้ว');$('fsubject').focus();
 });
 $('notme').addEventListener('click',function(){state.admin=null;save('mock-admin',null);showPanelState();renderCards();$('idname').focus()});
 $('fdate').addEventListener('change',function(){if(!$('fdue').value&&$('fhw').value==='1')$('fdue').value=addDays($('fdate').value,1);syncForm()});
