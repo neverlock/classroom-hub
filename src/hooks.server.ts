@@ -22,5 +22,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	res.headers.set('x-content-type-options', 'nosniff');
 	res.headers.set('referrer-policy', 'same-origin');
 	res.headers.set('x-frame-options', 'DENY');
+	// which build is running: `curl -I https://…` shows e.g. `x-app-version: 3311932 (main)`
+	res.headers.set('x-app-version', `${__BUILD_SHA__} (${__BUILD_BRANCH__})`);
 	return res;
 };
