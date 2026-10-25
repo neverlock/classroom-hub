@@ -13,13 +13,11 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async (event) => {
 	const { db, room, actor, student } = await roomContext(event);
 	const today = todayInBangkok();
-	const main = await loadMain(
-		db,
-		room,
-		{ term: event.url.searchParams.get('term'), date: event.url.searchParams.get('d') },
-		today
-	);
-	const formSubjects = actor ? (await loadSubjects(db, room.cls.id)).filter((s) => s.active) : [];
+	const [main, allSubjects] = await Promise.all([
+		loadMain(db, room, { term: event.url.searchParams.get('term'), date: event.url.searchParams.get('d') }, today),
+		actor ? loadSubjects(db, room.cls.id) : Promise.resolve([])
+	]);
+	const formSubjects = allSubjects.filter((s) => s.active);
 	return {
 		slug: room.cls.slug,
 		open: room.cls.active,

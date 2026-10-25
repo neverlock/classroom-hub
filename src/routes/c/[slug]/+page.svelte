@@ -122,6 +122,12 @@
 			<button class="btn" type="button" onclick={() => go(addDays(data.date, 1))} aria-label="วันถัดไป" disabled={data.date >= data.view.endDate}>วันถัดไป ›</button>
 		</div>
 
+		{#if data.view.isCurrent && data.today < data.view.startDate}
+			<div class="warn block">ภาคเรียนนี้ยังไม่เริ่ม (เริ่ม {fmtDate(data.view.startDate)}) จึงแสดงวันแรกของภาคเรียน</div>
+		{:else if data.view.isCurrent && data.today > data.view.endDate}
+			<div class="warn block">ภาคเรียนนี้สิ้นสุดแล้ว ({fmtDate(data.view.endDate)}) จึงแสดงวันสุดท้ายของภาคเรียน · แอดมินสร้างภาคเรียนใหม่ได้ที่หน้าจัดการห้อง</div>
+		{/if}
+
 		{#if data.terms.length > 1}
 			<div class="termbar">
 				<label for="termSel">📂 ภาคเรียน:</label>
@@ -192,7 +198,7 @@
 		</div>
 	{/if}
 
-	<p class="hint" style="text-align: center; margin-top: 28px"><a href={`${base}/manage`}>สำหรับแอดมินห้อง: จัดการห้อง</a></p>
+	<p class="hint" style="text-align: center; margin-top: 20px"><a href={`${base}/manage`} style="display: inline-grid; place-items: center; min-height: 44px; padding: 0 12px">สำหรับแอดมินห้อง: จัดการห้อง</a></p>
 </div>
 
 {#if zoom}

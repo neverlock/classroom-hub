@@ -20,12 +20,23 @@ function chunk<T>(list: T[], size = 80): T[][] {
 	return out;
 }
 
-export async function loadRoom(db: Db, slug: string): Promise<Room | null> {
+/**
+ * Loads a room. `alongside` runs extra reads (signed-in people, …) in parallel with the term list,
+ * so a page needs fewer sequential round trips to D1.
+ */
+export async function loadRoom<T = undefined>(
+	db: Db,
+	slug: string,
+	alongside?: (cls: ClassRow) => Promise<T>
+): Promise<{ room: Room; extra: T } | null> {
 	const cls = await db.select().from(classes).where(eq(classes.slug, slug)).get();
 	if (!cls) return null;
-	const list = await db.select().from(terms).where(eq(terms.classId, cls.id)).orderBy(desc(terms.startDate)).all();
+	const [list, extra] = await Promise.all([
+		db.select().from(terms).where(eq(terms.classId, cls.id)).orderBy(desc(terms.startDate)).all(),
+		alongside ? alongside(cls) : (Promise.resolve(undefined) as Promise<T>)
+	]);
 	const current = list.find((t) => t.id === cls.currentTermId) ?? null;
-	return { cls, terms: list, current };
+	return { room: { cls, terms: list, current }, extra };
 }
 
 export async function loadMain(db: Db, room: Room, params: { term?: string | null; date?: string | null }, today: string) {
@@ -48,7 +59,7 @@ export async function loadMain(db: Db, room: Room, params: { term?: string | nul
 	}
 	date = clampDate(date, view.startDate, view.endDate);
 
-	const rows = await db
+	const rowsQuery = db
 		.select({
 			id: entries.id,
 			lesson: entries.lesson,
@@ -67,24 +78,43 @@ export async function loadMain(db: Db, room: Room, params: { term?: string | nul
 		.orderBy(asc(subjects.sortOrder), asc(entries.id))
 		.all();
 
+	const hwQuery = db
+		.select({ id: entries.id, code: subjects.code, name: subjects.name, detail: entries.homeworkDetail, due: entries.homeworkDue })
+		.from(entries)
+		.innerJoin(subjects, eq(entries.subjectId, subjects.id))
+		.where(
+			and(
+				eq(entries.classId, cls.id),
+				eq(entries.hidden, false),
+				eq(entries.hasHomework, true),
+				gte(entries.entryDate, view.startDate),
+				lt(entries.entryDate, addDays(view.endDate, 1))
+			)
+		)
+		.orderBy(asc(entries.homeworkDue), asc(entries.id))
+		.all();
+	// both reads start together; later reads depend on the cards found here
+	const [rows, hwRows] = await Promise.all([rowsQuery, hwQuery]);
+
 	const entryIds = rows.map((r) => r.id);
 	const photosByEntry = new Map<number, number[]>();
 	const commentsByEntry = new Map<number, CardView['comments']>();
 	if (entryIds.length) {
-		const pics = await db
+		const picsQuery = db
 			.select({ id: attachments.id, entryId: attachments.entryId })
 			.from(attachments)
 			.where(inArray(attachments.entryId, entryIds))
 			.orderBy(asc(attachments.id))
 			.all();
-		for (const p of pics) photosByEntry.set(p.entryId!, [...(photosByEntry.get(p.entryId!) ?? []), p.id]);
-
-		const cs = await db
+		const commentsQuery = db
 			.select({ id: comments.id, entryId: comments.entryId, seatNo: comments.seatNo, body: comments.body, createdAt: comments.createdAt })
 			.from(comments)
 			.where(and(inArray(comments.entryId, entryIds), eq(comments.hidden, false)))
 			.orderBy(asc(comments.createdAt), asc(comments.id))
 			.all();
+		const [pics, cs] = await Promise.all([picsQuery, commentsQuery]);
+		for (const p of pics) photosByEntry.set(p.entryId!, [...(photosByEntry.get(p.entryId!) ?? []), p.id]);
+
 		const photosByComment = new Map<number, number[]>();
 		for (const ids of chunk(cs.map((c) => c.id))) {
 			const cp = await db
@@ -115,21 +145,6 @@ export async function loadMain(db: Db, room: Room, params: { term?: string | nul
 		comments: commentsByEntry.get(r.id) ?? []
 	}));
 
-	const hwRows = await db
-		.select({ id: entries.id, code: subjects.code, name: subjects.name, detail: entries.homeworkDetail, due: entries.homeworkDue })
-		.from(entries)
-		.innerJoin(subjects, eq(entries.subjectId, subjects.id))
-		.where(
-			and(
-				eq(entries.classId, cls.id),
-				eq(entries.hidden, false),
-				eq(entries.hasHomework, true),
-				gte(entries.entryDate, view.startDate),
-				lt(entries.entryDate, addDays(view.endDate, 1))
-			)
-		)
-		.orderBy(asc(entries.homeworkDue), asc(entries.id))
-		.all();
 	const toRow = (r: (typeof hwRows)[number]): HomeworkRow => ({ id: r.id, subjectCode: r.code, subjectName: r.name, detail: r.detail ?? '', due: r.due ?? '' });
 	const upcoming = isCurrent ? hwRows.filter((r) => (r.due ?? '') >= today).map(toRow) : [];
 	const overdue = hwRows.filter((r) => (r.due ?? '') < today).map(toRow).reverse();

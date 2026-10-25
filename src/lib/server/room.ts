@@ -17,12 +17,15 @@ export function iterationsFor(env: { PBKDF2_ITERATIONS?: string }): number {
 /** Everything a room page or action needs: bindings, the room itself and the signed-in people (if any). */
 export async function roomContext(event: Ev) {
 	const { env, db, secret } = useEnv(event);
-	const room = await loadRoom(db, event.params.slug);
-	if (!room) error(404, 'ไม่พบห้องนี้');
 	const c = { db, secret, cookies: event.cookies, secure: event.url.protocol === 'https:' };
-	const actor = await readActor(c, room.cls);
-	const student = await readStudent(c, room.cls);
-	return { env, db, secret, room, c, actor, student, ip: safeIp(event) };
+	// the signed-in people are looked up in parallel with the term list
+	const loaded = await loadRoom(db, event.params.slug, async (cls) => {
+		const [actor, student] = await Promise.all([readActor(c, cls), readStudent(c, cls)]);
+		return { actor, student };
+	});
+	if (!loaded) error(404, 'ไม่พบห้องนี้');
+	const { room, extra } = loaded;
+	return { env, db, secret, room, c, actor: extra.actor, student: extra.student, ip: safeIp(event) };
 }
 export type RoomContext = Awaited<ReturnType<typeof roomContext>>;
 
