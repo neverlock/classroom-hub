@@ -36,7 +36,7 @@
 - Member แก้ได้เฉพาะ post ของตัวเอง
 - `homework` / `lesson` ลงโดย class admin เป็นหลัก ส่วน member โพสต์ `note` และแนบรูป
 - อ่านได้ทุกคนโดยไม่ต้องกรอกอะไร
-- รูป: ไม่เกิน 3 รูปต่อ post, ไม่เกิน ~2MB ต่อรูป, เฉพาะ jpg/png/webp
+- รูป: ไม่เกิน 3 รูปต่อ post รับไฟล์ต้นฉบับขนาดเท่าไรก็ได้ แล้วย่อฝั่ง client ก่อนอัปโหลด (ดูหัวข้อ 5)
 
 ## 3. การยืนยันตัวตนของ member (ไม่มีรหัสห้อง)
 
@@ -77,7 +77,47 @@
 - `noindex` ทั้งเว็บเพื่อไม่ให้ search engine เก็บ
 - Backup D1 เป็น SQL เป็นระยะ (cron/GitHub Action) ไปเก็บใน R2
 
-## 5. Deploy
+## 5. รูปภาพ: ย่อก่อนเก็บ
+
+ผู้ใช้เลือกรูปจากมือถือได้ทุกขนาด (หลาย MB ก็ได้) ระบบย่อให้เองก่อนอัปโหลด
+
+**ทำฝั่ง browser ไม่ทำฝั่ง server** เพราะ Workers free tier มี CPU จำกัดมาก (~10ms ต่อ request) ย่อรูปบน Worker ไม่ไหว และการย่อก่อนส่งยังประหยัดเน็ตมือถือของผู้ใช้ด้วย
+
+ขั้นตอน (ไม่ต้องใช้ library):
+
+1. `createImageBitmap(file, { imageOrientation: 'from-image' })` — อ่านรูปและหมุนตาม EXIF ให้ถูกทิศ
+2. คำนวณขนาดใหม่ให้ด้านยาวสุด ≤ **1600px** (รักษาสัดส่วน ไม่ขยายรูปที่เล็กกว่านั้น)
+3. วาดลง canvas แล้ว `canvas.toBlob(..., 'image/webp', 0.8)` (fallback เป็น `image/jpeg` ถ้า browser ไม่รองรับ webp)
+4. อัปโหลด blob ที่ได้ ปกติรูปจากมือถือ 3–8MB จะเหลือราว 150–400KB
+
+ผลพลอยได้: การวาดใหม่ผ่าน canvas ตัด EXIF ทิ้ง ทำให้พิกัด GPS และข้อมูลกล้องไม่หลุดไปกับรูปเด็ก
+
+กฎที่ยังต้องมี:
+
+- Server จำกัดขนาดไฟล์**หลังย่อ**ที่ ~1MB ต่อรูป และตรวจ content-type (jpg/png/webp) เพราะฝั่ง client ถูกข้ามได้
+- ถ้า browser ถอดรหัสรูปไม่ได้ (เช่น HEIC บางเครื่อง) ให้แจ้งผู้ใช้ให้เลือกรูปอื่น ไม่ต้องอัปไฟล์ดิบ
+- จำกัด 3 รูปต่อ post
+- ประมาณการ: 10GB ของ R2 free เก็บรูปราว 300KB ได้หลักหมื่นรูป เกินพอสำหรับห้องเรียน
+
+## 6. Framework
+
+**SvelteKit + `@sveltejs/adapter-cloudflare`**
+
+เหตุผล:
+
+- Bundle เล็ก เหมาะกับขีดจำกัดขนาด Worker ของ free tier (Next.js บน Cloudflare มักใหญ่กว่ามาก)
+- เข้าถึง D1/R2 ผ่าน `platform.env` ได้ตรงๆ
+- Form actions ทำงานได้แม้ไม่มี JS ฝั่ง client ทำให้ฟอร์มง่ายและเสถียร
+- SSR ในตัว หน้าอ่านเปิดเร็วบนมือถือ
+- Drizzle ORM รองรับ D1 และมี migration
+
+ทางเลือกที่ไม่เลือก: Next.js (หนัก, ต้องผ่าน OpenNext), Hono ล้วน (เบาที่สุดแต่ต้องทำ UI/routing เอง)
+
+**การอยู่ใน free limit:** Workers free ให้ ~100,000 requests ต่อวัน ส่วนไฟล์ static ไม่นับ ห้องเรียนเดียวใช้ไม่ถึงหลักพันต่อวัน แนะนำให้ cache หน้าอ่านสั้นๆ ที่ edge เพื่อลดการเรียก D1 อีกชั้น
+
+Cloudflare แนะนำ Workers + static assets แทน Pages สำหรับโปรเจกต์ใหม่ ให้ตรวจเอกสารล่าสุดตอน scaffold
+
+## 7. Deploy
 
 Cloudflare ทั้งหมด:
 
@@ -91,7 +131,7 @@ Cloudflare ทั้งหมด:
 
 โควตา free tier เปลี่ยนได้ ควรตรวจหน้า pricing ของ Cloudflare ก่อนใช้งานจริง
 
-## 6. โครงสร้างข้อมูล
+## 8. โครงสร้างข้อมูล
 
 ```
 classes        id, slug (unique), name, active, created_at
@@ -109,7 +149,7 @@ attachments    id, post_id, r2_key, size, created_at
 - แสดงผล "เลขที่ N" จาก join `posts.student_id → students.seat_no`
 - ใช้ soft delete ผ่าน `hidden` เพื่อกู้คืนได้
 
-## 7. เส้นทาง (routes)
+## 9. เส้นทาง (routes)
 
 ```
 /                      รายการห้อง (redirect ถ้ามีห้องเดียว)
@@ -122,7 +162,7 @@ attachments    id, post_id, r2_key, size, created_at
 
 `/admin/*` และ API เขียนฝั่ง admin ป้องกันด้วย Cloudflare Access แล้วตรวจ email กับ `SUPER_ADMINS` / `class_admins` ใน Worker อีกชั้น
 
-## 8. ลำดับการพัฒนา
+## 10. ลำดับการพัฒนา
 
 1. Scaffold + เชื่อม Cloudflare + CI
 2. Schema/migration + หน้าอ่าน (วันนี้, ย้อนหลัง)
