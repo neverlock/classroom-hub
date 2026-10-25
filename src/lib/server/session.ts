@@ -1,5 +1,4 @@
 import type { Cookies } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
 import { classAdmins, students } from './db/schema';
 import { signToken, verifyToken } from './crypto';
 import type { Db } from './env';
@@ -53,20 +52,23 @@ export function clearAdminCookie(cookies: Cookies, slug: string) {
 	cookies.delete(adminName(slug), { path: '/' });
 }
 
-/** The signed-in room admin (or super admin acting in the room), re-checked against the database every time. */
-export async function readActor(c: Ctx, cls: ClassRef): Promise<Actor | null> {
-	const raw = c.cookies.get(adminName(cls.slug));
-	const tok = await verifyToken<AdminToken | SuperToken>(raw, c.secret);
+export type AdminTokenData = AdminToken | SuperToken;
+
+/** Reads (and verifies the signature of) the admin cookie without touching the database. */
+export async function peekAdmin(c: Pick<Ctx, 'cookies' | 'secret'>, slug: string): Promise<AdminTokenData | null> {
+	const tok = await verifyToken<AdminToken | SuperToken>(c.cookies.get(adminName(slug)), c.secret);
+	return tok && (tok.k === 'a' || tok.k === 's') ? tok : null;
+}
+
+/**
+ * The signed-in room admin (or super admin acting in the room). `row` is the admin's database row,
+ * loaded in the same batch as the room; it is re-checked every time so deactivating someone takes effect at once.
+ */
+export function toActor(tok: AdminTokenData | null, cls: ClassRef, row: typeof classAdmins.$inferSelect | undefined): Actor | null {
 	if (!tok || tok.cid !== cls.id) return null;
 	if (tok.k === 's') return { adminId: null, display: 'ผู้ดูแลระบบ', isSuper: true };
-	if (tok.k !== 'a') return null;
-	const a = await c.db
-		.select()
-		.from(classAdmins)
-		.where(and(eq(classAdmins.id, tok.aid), eq(classAdmins.classId, cls.id)))
-		.get();
-	if (!a || !a.active || a.sessionVersion !== tok.v) return null;
-	return { adminId: a.id, display: a.display, isSuper: false };
+	if (!row || row.id !== tok.aid || row.classId !== cls.id || !row.active || row.sessionVersion !== tok.v) return null;
+	return { adminId: row.id, display: row.display, isSuper: false };
 }
 
 export async function setStudentCookie(c: Ctx, cls: ClassRef, studentId: number) {
@@ -78,13 +80,12 @@ export function clearStudentCookie(cookies: Cookies, slug: string) {
 	cookies.delete(studentName(slug), { path: '/' });
 }
 
-export async function readStudent(c: Ctx, cls: ClassRef) {
-	const tok = await verifyToken<StudentToken>(c.cookies.get(studentName(cls.slug)), c.secret);
-	if (!tok || tok.k !== 'st' || tok.cid !== cls.id) return null;
-	const s = await c.db
-		.select()
-		.from(students)
-		.where(and(eq(students.id, tok.sid), eq(students.classId, cls.id)))
-		.get();
-	return s && s.active ? s : null;
+export async function peekStudent(c: Pick<Ctx, 'cookies' | 'secret'>, slug: string): Promise<StudentToken | null> {
+	const tok = await verifyToken<StudentToken>(c.cookies.get(studentName(slug)), c.secret);
+	return tok && tok.k === 'st' ? tok : null;
+}
+
+export function toStudent(tok: StudentToken | null, cls: ClassRef, row: typeof students.$inferSelect | undefined) {
+	if (!tok || tok.cid !== cls.id || !row || row.id !== tok.sid || row.classId !== cls.id || !row.active) return null;
+	return row;
 }

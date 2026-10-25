@@ -3,6 +3,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { classAdmins, classes, comments, entries, students, subjects, terms } from '#lib/server/db/schema.js';
 import { adminContext, forgetStudentAction, loginAction, logoutAction, roomContext } from '#lib/server/room.js';
 import { loadSubjects } from '#lib/server/queries.js';
+import { batch } from '#lib/server/env.js';
 import { lengthError, parseStudentLines, readText, suggestNextTerm, validateTerm } from '#lib/validate.js';
 import { todayInBangkok } from '#lib/dates.js';
 import type { Actions, PageServerLoad } from './$types';
@@ -15,36 +16,39 @@ export const load: PageServerLoad = async (event) => {
 	const tab = ['subjects', 'students', 'settings'].includes(event.url.searchParams.get('tab') ?? '')
 		? (event.url.searchParams.get('tab') as 'subjects' | 'students' | 'settings')
 		: 'subjects';
-	const subjectRows = await loadSubjects(db, room.cls.id);
-	const counts = await db
-		.select({ id: entries.subjectId, n: sql<number>`count(*)` })
-		.from(entries)
-		.where(eq(entries.classId, room.cls.id))
-		.groupBy(entries.subjectId)
-		.all();
+	// all six lists in ONE round trip to D1
+	const [subjectRows, counts, studentRows, admins, hiddenEntries, hiddenCommentRows] = (await batch(db, [
+		db.select().from(subjects).where(eq(subjects.classId, room.cls.id)).orderBy(asc(subjects.sortOrder), asc(subjects.id)),
+		db.select({ id: entries.subjectId, n: sql<number>`count(*)` }).from(entries).where(eq(entries.classId, room.cls.id)).groupBy(entries.subjectId),
+		db.select().from(students).where(eq(students.classId, room.cls.id)).orderBy(asc(students.seatNo), asc(students.id)),
+		db
+			.select({ id: classAdmins.id, display: classAdmins.display, username: classAdmins.username, active: classAdmins.active, lastLoginAt: classAdmins.lastLoginAt })
+			.from(classAdmins)
+			.where(eq(classAdmins.classId, room.cls.id))
+			.orderBy(asc(classAdmins.id)),
+		db
+			.select({ id: entries.id, date: entries.entryDate, code: subjects.code, name: subjects.name, by: entries.hiddenBy, at: entries.hiddenAt })
+			.from(entries)
+			.innerJoin(subjects, eq(entries.subjectId, subjects.id))
+			.where(and(eq(entries.classId, room.cls.id), eq(entries.hidden, true)))
+			.orderBy(desc(entries.hiddenAt)),
+		db
+			.select({ id: comments.id, seat: comments.seatNo, body: comments.body, date: entries.entryDate, code: subjects.code, by: comments.hiddenBy, at: comments.hiddenAt })
+			.from(comments)
+			.innerJoin(entries, eq(comments.entryId, entries.id))
+			.innerJoin(subjects, eq(entries.subjectId, subjects.id))
+			.where(and(eq(entries.classId, room.cls.id), eq(comments.hidden, true)))
+			.orderBy(desc(comments.hiddenAt))
+	])) as [
+		(typeof subjects.$inferSelect)[],
+		{ id: number; n: number }[],
+		(typeof students.$inferSelect)[],
+		{ id: number; display: string; username: string; active: boolean; lastLoginAt: number | null }[],
+		{ id: number; date: string; code: string; name: string; by: string | null; at: number | null }[],
+		{ id: number; seat: number; body: string; date: string; code: string; by: string | null; at: number | null }[]
+	];
 	const countOf = new Map(counts.map((c) => [c.id, c.n]));
-	const studentRows = await db.select().from(students).where(eq(students.classId, room.cls.id)).orderBy(asc(students.seatNo), asc(students.id)).all();
-	const admins = await db
-		.select({ id: classAdmins.id, display: classAdmins.display, username: classAdmins.username, active: classAdmins.active, lastLoginAt: classAdmins.lastLoginAt })
-		.from(classAdmins)
-		.where(eq(classAdmins.classId, room.cls.id))
-		.orderBy(asc(classAdmins.id))
-		.all();
-	const hiddenEntries = await db
-		.select({ id: entries.id, date: entries.entryDate, code: subjects.code, name: subjects.name, by: entries.hiddenBy, at: entries.hiddenAt })
-		.from(entries)
-		.innerJoin(subjects, eq(entries.subjectId, subjects.id))
-		.where(and(eq(entries.classId, room.cls.id), eq(entries.hidden, true)))
-		.orderBy(desc(entries.hiddenAt))
-		.all();
-	const hiddenComments = await db
-		.select({ id: comments.id, seat: comments.seatNo, body: comments.body, date: entries.entryDate, code: subjects.code, by: comments.hiddenBy, at: comments.hiddenAt })
-		.from(comments)
-		.innerJoin(entries, eq(comments.entryId, entries.id))
-		.innerJoin(subjects, eq(entries.subjectId, subjects.id))
-		.where(and(eq(entries.classId, room.cls.id), eq(comments.hidden, true)))
-		.orderBy(desc(comments.hiddenAt))
-		.all();
+	const hiddenComments = hiddenCommentRows;
 
 	const today = todayInBangkok();
 	return {

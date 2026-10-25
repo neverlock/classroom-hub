@@ -4,8 +4,8 @@ import { classAdmins } from './db/schema';
 import { hashPassword, verifyPassword } from './crypto';
 import { clearFailures, isLimited, recordFailure } from './rate-limit';
 import { useEnv } from './env';
-import { findStudentByCode, loadRoom, type Room } from './queries';
-import { clearAdminCookie, clearStudentCookie, readActor, readStudent, setAdminCookie, setStudentCookie } from './session';
+import { findStudentByCode, loadRoomBundle, type Room } from './queries';
+import { clearAdminCookie, clearStudentCookie, peekAdmin, peekStudent, setAdminCookie, setStudentCookie, toActor, toStudent } from './session';
 
 type Ev = RequestEvent<{ slug: string }>;
 
@@ -17,15 +17,16 @@ export function iterationsFor(env: { PBKDF2_ITERATIONS?: string }): number {
 /** Everything a room page or action needs: bindings, the room itself and the signed-in people (if any). */
 export async function roomContext(event: Ev) {
 	const { env, db, secret } = useEnv(event);
+	const slug = event.params.slug;
 	const c = { db, secret, cookies: event.cookies, secure: event.url.protocol === 'https:' };
-	// the signed-in people are looked up in parallel with the term list
-	const loaded = await loadRoom(db, event.params.slug, async (cls) => {
-		const [actor, student] = await Promise.all([readActor(c, cls), readStudent(c, cls)]);
-		return { actor, student };
-	});
+	// cookies are verified without the database; the room and the signed-in people then load in ONE batch
+	const [adminTok, studentTok] = await Promise.all([peekAdmin(c, slug), peekStudent(c, slug)]);
+	const loaded = await loadRoomBundle(db, slug, adminTok?.k === 'a' ? adminTok.aid : null, studentTok?.sid ?? null);
 	if (!loaded) error(404, 'ไม่พบห้องนี้');
-	const { room, extra } = loaded;
-	return { env, db, secret, room, c, actor: extra.actor, student: extra.student, ip: safeIp(event) };
+	const { room, adminRow, studentRow } = loaded;
+	const actor = toActor(adminTok, room.cls, adminRow);
+	const student = toStudent(studentTok, room.cls, studentRow);
+	return { env, db, secret, room, c, actor, student, ip: safeIp(event) };
 }
 export type RoomContext = Awaited<ReturnType<typeof roomContext>>;
 

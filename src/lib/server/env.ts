@@ -12,3 +12,11 @@ export function useEnv(_event?: unknown) {
 }
 
 export type Db = ReturnType<typeof getDb>;
+
+/**
+ * Runs several read queries in ONE round trip to D1 (`db.batch`). Each extra round trip costs the
+ * distance to the database, so pages group their independent queries here. Results come back in order.
+ */
+export function batch(db: Db, queries: unknown[]): Promise<Record<string, unknown>[][]> {
+	return db.batch(queries as unknown as Parameters<Db['batch']>[0]) as unknown as Promise<Record<string, unknown>[][]>;
+}

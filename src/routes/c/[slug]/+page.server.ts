@@ -3,7 +3,7 @@ import { and, eq, notInArray } from 'drizzle-orm';
 import { todayInBangkok, isIsoDate } from '#lib/dates.js';
 import { attachments, comments, entries, subjects } from '#lib/server/db/schema.js';
 import { lengthError, MAX_COMMENT_IMAGES, MAX_ENTRY_IMAGES, readText } from '#lib/validate.js';
-import { loadMain, loadSubjects } from '#lib/server/queries.js';
+import { loadMain } from '#lib/server/queries.js';
 import { adminContext, forgetStudentAction, identifyStudent, identifyWriter, loginAction, logoutAction, rememberStudent, roomContext } from '#lib/server/room.js';
 import { pickFiles, saveImages } from '#lib/server/uploads.js';
 import type { Actions, PageServerLoad } from './$types';
@@ -12,11 +12,8 @@ export const load: PageServerLoad = async (event) => {
 	const { db, room, actor, student } = await roomContext(event);
 	const today = todayInBangkok();
 	const viewer = { admin: !!actor, studentId: student?.id ?? null };
-	const [main, allSubjects] = await Promise.all([
-		loadMain(db, room, { term: event.url.searchParams.get('term'), date: event.url.searchParams.get('d') }, today, viewer),
-		loadSubjects(db, room.cls.id)
-	]);
-	const formSubjects = allSubjects.filter((s) => s.active);
+	const main = await loadMain(db, room, { term: event.url.searchParams.get('term'), date: event.url.searchParams.get('d') }, today, viewer);
+	const formSubjects = main.subjects.filter((s) => s.active);
 	return {
 		slug: room.cls.slug,
 		open: room.cls.active,
