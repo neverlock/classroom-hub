@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local development (`npm run preview` / `vite dev`). Never commit .dev.vars.
+SESSION_SECRET="change-me-to-a-long-random-string-at-least-32-chars"
+# In `vite dev` only: act as this super admin without Cloudflare Access.
+DEV_SUPER_ADMIN="you@example.com"

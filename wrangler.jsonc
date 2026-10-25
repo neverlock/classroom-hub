@@ -1,0 +1,37 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "classroom-hub",
+	"compatibility_date": "2026-10-25",
+	"compatibility_flags": ["nodejs_als"],
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+
+	// The only public entry point is the custom domain, which is where Cloudflare Access
+	// protects /admin. Keep workers.dev and preview URLs off, otherwise /admin would be
+	// reachable without going through Access.
+	"workers_dev": false,
+	"preview_urls": false,
+	"routes": [{ "pattern": "classroom.conf.in.th", "custom_domain": true }],
+
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "classroom-hub",
+			"database_id": "1ad34d8d-97fa-49fe-95c8-c63d00c50d25",
+			"migrations_dir": "drizzle"
+		}
+	],
+	"r2_buckets": [{ "binding": "IMAGES", "bucket_name": "classroom-hub-images" }],
+
+	// Non-secret settings. Secrets (SESSION_SECRET, optional SUPER_ADMINS) are set in the
+	// Cloudflare dashboard or with `wrangler secret put`; never commit them (this repo is public).
+	"vars": {
+		"CF_ACCESS_TEAM_DOMAIN": "neverlock.cloudflareaccess.com",
+		"CF_ACCESS_AUD": "f8875c91c317a11e267f1c8ed95380cc3161306e9e847f9588ba101474e4b178",
+		"PBKDF2_ITERATIONS": "20000"
+	},
+	"observability": { "enabled": true }
+}
