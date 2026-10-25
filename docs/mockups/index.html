@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>บันทึกการเรียนการสอน</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600&family=Sarabun:wght@400;500;700&display=swap">
+<style>
+/* Layout: one centred column (max 980px) like the original app; cards go 2-up on wide screens, 1-up on phones. */
+:root{
+  --bg:#f5efe3; --surface:#ffffff; --ink:#43291a; --muted:#85705c; --line:#e6dccb;
+  --accent:#ffcc0a; --accent-ink:#43291a; --hw-bg:#fff7d6; --hw-line:#f1c40f;
+  --chip-bg:#43291a; --chip-ink:#ffcc0a; --due-bg:#f0b45a; --due-ink:#43291a;
+  --good:#2f8a3e; --danger:#b83a2a; --panel:#efe7da; --focus:#1b6fd8;
+  --font-display:'Prompt','Sarabun',system-ui,sans-serif;
+  --font-body:'Sarabun','Noto Sans Thai',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1b140e; --surface:#2a2017; --ink:#f4e9d7; --muted:#b9a68e; --line:#43362a;
+  --accent:#ffcc0a; --accent-ink:#2a1a0c; --hw-bg:#3a3010; --hw-line:#c9a008;
+  --chip-bg:#ffcc0a; --chip-ink:#2a1a0c; --due-bg:#a8742a; --due-ink:#fff4e0;
+  --good:#6fcb7e; --danger:#ff8d7a; --panel:#33281d; --focus:#7db4ff; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1b140e; --surface:#2a2017; --ink:#f4e9d7; --muted:#b9a68e; --line:#43362a;
+  --accent:#ffcc0a; --accent-ink:#2a1a0c; --hw-bg:#3a3010; --hw-line:#c9a008;
+  --chip-bg:#ffcc0a; --chip-ink:#2a1a0c; --due-bg:#a8742a; --due-ink:#fff4e0;
+  --good:#6fcb7e; --danger:#ff8d7a; --panel:#33281d; --focus:#7db4ff; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.55;
+  padding-block:20px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:980px;margin:0 auto;background:var(--surface);border-radius:20px;border-top:12px solid var(--ink);
+  padding:28px clamp(16px,4vw,44px) 36px;box-shadow:0 8px 30px rgba(67,41,26,.10)}
+h1{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,4.6vw,32px);text-align:center;margin:0 0 6px;text-wrap:balance}
+.sub{text-align:center;color:var(--muted);font-size:14px;margin:0 0 14px}
+.mock{display:block;width:fit-content;margin:0 auto 14px;font-size:12px;letter-spacing:.04em;padding:3px 12px;border-radius:99px;border:1px dashed var(--muted);color:var(--muted)}
+.rule{height:3px;background:var(--accent);border:0;margin:0 0 18px}
+h2{font-family:var(--font-display);font-weight:600;font-size:clamp(18px,3.4vw,22px);margin:30px 0 12px;padding-left:12px;border-left:4px solid var(--ink);text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.cta{display:block;width:100%;background:var(--accent);color:var(--accent-ink);border:0;border-radius:12px;padding:15px 16px;font-family:var(--font-display);font-weight:600;font-size:18px;cursor:pointer}
+.cta[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.cta:hover{filter:brightness(.96)}
+
+/* expandable panel */
+.panel{background:var(--panel);border:2px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:20px clamp(14px,3vw,28px) 24px;margin-bottom:6px}
+.panel h3{font-family:var(--font-display);margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ink);font-size:19px}
+label{display:block;font-weight:700;margin:14px 0 5px}
+input[type=text],input[type=date],input[type=password],select,textarea{width:100%;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+textarea{min-height:88px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row>*{min-width:0}
+.btn{border:0;border-radius:10px;padding:13px 16px;background:var(--ink);color:var(--accent);font-weight:700;cursor:pointer;width:100%;margin-top:18px;font-size:17px}
+.btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--ink);width:auto;margin:0;padding:8px 14px;font-size:15px}
+.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0;font-size:14px}
+.who{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;font-size:14px;color:var(--muted);margin-bottom:2px}
+.note-edit{background:var(--hw-bg);border:1px solid var(--hw-line);border-radius:10px;padding:8px 12px;font-size:14px;margin-top:12px}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+.err{color:var(--danger);font-size:14px;margin:8px 0 0;min-height:1.2em}
+.thumbs{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.thumb{display:flex;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 10px 6px 6px;font-size:13px}
+.thumb img{width:44px;height:44px;object-fit:cover;border-radius:6px}
+.thumb small{display:block;color:var(--muted)}
+
+/* date bar */
+.datebar{margin:18px 0 0;border:1.5px dashed var(--hw-line);background:var(--hw-bg);border-radius:12px;padding:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}
+.datebar input{width:auto}
+.datebar .btn{margin:0;width:auto;padding:9px 14px;font-size:15px}
+
+/* cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px}
+.card{position:relative;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--ink);border-radius:12px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card.hw{background:var(--hw-bg);border:2px solid var(--hw-line);border-left-width:6px}
+.card h3{font-family:var(--font-display);font-weight:600;font-size:18px;margin:0;padding-right:70px;overflow-wrap:anywhere}
+.card p{margin:0;overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-block;border-radius:8px;padding:2px 10px;font-weight:700;font-size:14px;background:var(--chip-bg);color:var(--chip-ink)}
+.chip.due{background:var(--due-bg);color:var(--due-ink)}
+.chip.late{background:var(--danger);color:#fff}
+.nohw{margin-top:auto;color:var(--good);font-weight:700}
+.byline{font-size:12px;color:var(--muted)}
+.tools{position:absolute;top:10px;right:10px;display:flex;gap:6px}
+.tools button{background:var(--surface);border:1px solid var(--line);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:15px}
+.tools button.sure{width:auto;padding:0 10px;background:var(--danger);color:#fff;border-color:var(--danger);font-size:13px;font-weight:700}
+.pics{display:flex;gap:6px;flex-wrap:wrap}
+.pics img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.empty{border:1.5px dashed var(--line);border-radius:12px;padding:26px 14px;text-align:center;color:var(--muted)}
+
+/* upcoming + overdue */
+.list{display:flex;flex-direction:column;gap:10px}
+.item{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--hw-line);border-radius:10px;padding:12px 14px}
+.item>div{min-width:0}
+.item b{overflow-wrap:anywhere}
+.item p{margin:2px 0 0;overflow-wrap:anywhere}
+.item .chip{flex:none}
+details.over{margin-top:26px;border:1.5px solid var(--line);border-radius:12px}
+details.over>summary{cursor:pointer;list-style:none;padding:14px 16px;font-family:var(--font-display);font-weight:600;font-size:18px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+details.over>summary::-webkit-details-marker{display:none}
+details.over>summary::after{content:"▸ ขยาย";font-family:var(--font-body);font-size:14px;font-weight:500;color:var(--muted);white-space:nowrap}
+details.over[open]>summary::after{content:"▾ ย่อ"}
+.over-body{padding:0 16px 16px}
+.month{margin:16px 0 8px;font-weight:700;color:var(--muted);display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:4px}
+.more{margin-top:14px}
+
+/* notes */
+.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.note header{font-size:13px;color:var(--muted);margin-bottom:2px}
+.note header b{color:var(--ink)}
+.note p{margin:0;overflow-wrap:anywhere}
+.notebar{margin-top:14px}
+.foot{margin-top:28px;font-size:13px;color:var(--muted);text-align:center}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:11px 20px;border-radius:99px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:20;max-width:calc(100% - 32px)}
+@media (max-width:560px){.row{grid-template-columns:1fr}.item{flex-direction:column}}
+@media (prefers-reduced-motion:no-preference){.card,.item{transition:transform .15s}.card:hover{transform:translateY(-2px)}}
+</style>
+
+<div class="wrap">
+  <h1>บันทึกการเรียนการสอน ป.5/1</h1>
+  <p class="sub" id="todayLabel"></p>
+  <span class="mock">ตัวอย่างหน้าตา · ข้อมูลสมมติ</span>
+  <hr class="rule">
+
+  <button class="cta" id="toggle" aria-expanded="false" aria-controls="panel">+ บันทึกสิ่งที่เรียน / การบ้านใหม่</button>
+  <section class="panel" id="panel" hidden>
+    <div id="identify">
+      <h3>ก่อนบันทึก ขอทราบว่าคุณคือใคร</h3>
+      <label for="idname">ชื่อผู้บันทึก</label>
+      <input type="text" id="idname" autocomplete="off" placeholder="เช่น แม่น้องมาย / ครูต้น">
+      <label for="idpin">รหัสแอดมินห้อง</label>
+      <input type="password" id="idpin" autocomplete="off" inputmode="numeric">
+      <p class="hint">ตัวอย่างนี้ใช้รหัส <b>1234</b> · กรอกครั้งเดียว ระบบจะจำเครื่องนี้ไว้ ไม่ต้องกรอกอีก</p>
+      <p class="err" id="iderr" role="alert"></p>
+      <button class="btn" id="idgo" type="button">ยืนยัน</button>
+    </div>
+
+    <form id="entryForm" hidden>
+      <div class="who"><span>บันทึกโดย: <b id="whoName"></b></span><button class="linkbtn" id="notme" type="button">ไม่ใช่ฉัน?</button></div>
+      <h3 id="formTitle">ฟอร์มบันทึกข้อมูล</h3>
+      <div class="note-edit" id="editNote" hidden>วิชานี้มีบันทึกของวันที่เลือกอยู่แล้ว กำลังแก้ไขของเดิม ไม่สร้างซ้ำ</div>
+      <div class="row">
+        <div><label for="fdate">วันที่เรียน *</label><input type="date" id="fdate" required></div>
+        <div><label for="fsubject">วิชา *</label><select id="fsubject" required></select></div>
+      </div>
+      <label for="flesson">สิ่งที่เรียนวันนี้ (เนื้อหาที่เรียน/งานในคาบ) *</label>
+      <textarea id="flesson" required></textarea>
+      <label for="fhw">การบ้าน *</label>
+      <select id="fhw"><option value="0">ไม่มี</option><option value="1">มี</option></select>
+      <div id="hwFields" hidden>
+        <label for="fdetail">โจทย์การบ้าน *</label>
+        <textarea id="fdetail"></textarea>
+        <label for="fdue">วันที่ส่ง *</label>
+        <input type="date" id="fdue">
+      </div>
+      <label for="fphotos">แนบรูป (ไม่เกิน 3 รูป · ถ่ายจากมือถือได้ ระบบย่อให้เอง)</label>
+      <input type="file" id="fphotos" accept="image/*" multiple>
+      <div class="thumbs" id="thumbs"></div>
+      <p class="err" id="formerr" role="alert"></p>
+      <button class="btn" id="save" type="submit">บันทึกข้อมูล</button>
+    </form>
+  </section>
+
+  <div class="datebar">
+    <label for="pickDate" style="margin:0">📅 เลือกวันที่ดูข้อมูล:</label>
+    <input type="date" id="pickDate">
+    <button class="btn" id="prevDay" type="button" aria-label="วันก่อนหน้า">‹ วันก่อน</button>
+    <button class="btn" id="goToday" type="button">วันนี้</button>
+    <button class="btn" id="nextDay" type="button" aria-label="วันถัดไป">วันถัดไป ›</button>
+  </div>
+
+  <h2>📚 สิ่งที่เรียน (ตามวันที่เลือก)</h2>
+  <div class="grid" id="cards"></div>
+
+  <h2>📌 การบ้านที่ต้องส่ง (เรียงตามกำหนด)</h2>
+  <div class="list" id="upcoming"></div>
+
+  <details class="over" id="overdue">
+    <summary><span id="overTitle">⏰ งานเลยกำหนดส่ง</span></summary>
+    <div class="over-body" id="overBody"></div>
+  </details>
+
+  <h2>💬 ข้อความจากเพื่อน</h2>
+  <div class="list" id="notes"></div>
+  <div class="notebar">
+    <button class="btn alt" id="noteToggle" type="button" aria-expanded="false">+ เขียนข้อความ</button>
+    <form id="noteForm" hidden style="margin-top:12px">
+      <label for="ncode" style="margin-top:0">รหัสนักเรียน</label>
+      <input type="text" id="ncode" inputmode="numeric" autocomplete="off" placeholder="เช่น 10112">
+      <p class="hint" id="nwho">ตัวอย่าง: 10112 จะแสดงเป็น "เลขที่ 12" · กรอกครั้งเดียว ระบบจำเครื่องนี้ไว้</p>
+      <label for="ntext">ข้อความ</label>
+      <textarea id="ntext"></textarea>
+      <p class="err" id="nerr" role="alert"></p>
+      <button class="btn" type="submit">โพสต์ข้อความ</button>
+    </form>
+  </div>
+
+  <p class="foot">หน้าตัวอย่างสำหรับตรวจแบบ · ข้อมูลทั้งหมดเป็นข้อมูลสมมติและไม่ถูกเก็บถาวร</p>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+var MONTHS=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+var DAYS=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+var PIN='1234';
+var $=function(id){return document.getElementById(id)};
+var pad=function(n){return String(n).padStart(2,'0')};
+var iso=function(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+var parse=function(s){var p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2])};
+var addDays=function(s,n){var d=parse(s);d.setDate(d.getDate()+n);return iso(d)};
+var fmt=function(s){var p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0]};
+var diffDays=function(a,b){return Math.round((parse(a)-parse(b))/86400000)};
+var esc=function(t){var d=document.createElement('div');d.textContent=t==null?'':String(t);return d.innerHTML};
+var TODAY=iso(new Date());
+
+var subjects=[
+ {id:'m',code:'ค21103',name:'คณิตศาสตร์ 1'},
+ {id:'e',code:'อ21103',name:'ภาษาอังกฤษเข้ม'},
+ {id:'l',code:'อ21213',name:'เสริมทักษะการฟัง-พูดภาษาอังกฤษ 1'},
+ {id:'c',code:'ว21203',name:'คอมพิวเตอร์และการออกแบบเทคโนโลยี 1'},
+ {id:'b',code:'ก20913',name:'E-Com'}
+];
+var subj=function(id){return subjects.filter(function(s){return s.id===id})[0]};
+
+var nextId=1, entries=[];
+function seed(dayOff,sid,lesson,hwDetail,dueOff,author){
+  entries.push({id:nextId++,date:addDays(TODAY,dayOff),sid:sid,lesson:lesson,
+    hw:hwDetail?1:0,detail:hwDetail||'',due:hwDetail?addDays(TODAY,dueOff):'',author:author||'แม่น้องมาย',photos:[]});
+}
+seed(0,'m','การหาร เลขทศนิยม','ทำข้อหนึ่งข้อสอง ลงในสมุด ส่วนที่เหลือทำในหนังสือ หน้า195',2);
+seed(0,'e','เรียนบทที่ 4 ต่อ');
+seed(0,'l','เรียนเรื่องการท่องเที่ยว');
+seed(0,'c','เรียนบทที่ 4','หน้า111 112 แค่ข้อ1กับ 3 115 ลงใน Canva ส่งวันนี้ 23.59',0,'ครูต้น');
+seed(0,'b','Natural disasters');
+seed(-1,'m','การคูณเลขทศนิยม','แบบฝึกหัด 3.2 หน้า 88 ทุกข้อ',4);
+seed(-2,'e','Unit 3 Vocabulary','เขียนศัพท์ 20 คำ คำละ 3 รอบ',-1);
+seed(-6,'c','ออกแบบแผนผังความคิด','ทำ mind map หัวข้อเทคโนโลยีรอบตัว ลงใน Canva',-3,'ครูต้น');
+seed(-12,'m','การบวกลบเศษส่วน','แบบฝึกหัด 2.5 หน้า 61',-9);
+seed(-20,'l','Travel phrases','ฝึกพูดแนะนำสถานที่ท่องเที่ยว บันทึกเสียงส่งครู',-16);
+seed(-30,'e','Unit 2 Grammar','ทำ worksheet หน้า 22–24',-24);
+seed(-41,'c','พื้นฐานการใช้ Canva','สร้างโปสเตอร์ 1 ชิ้น',-33,'ครูต้น');
+seed(-55,'m','สมการเบื้องต้น','แบบฝึกหัด 1.8 หน้า 40',-47);
+seed(-70,'b','Online shopping','สรุปข้อดีข้อเสียการซื้อของออนไลน์ 5 ข้อ',-61);
+seed(-88,'m','ตัวประกอบของจำนวนนับ','แบบฝึกหัด 1.2 หน้า 18',-75);
+seed(-110,'e','Unit 1 Greetings','ท่อง dialogue หน้า 8',-95);
+
+var notes=[
+ {seat:12,time:'วันนี้ 14:30',text:'พรุ่งนี้ต้องเอาสีน้ำมาด้วยนะ ครูบอกตอนท้ายคาบศิลปะ'},
+ {seat:5,time:'เมื่อวาน 18:02',text:'ใครมีชีทวิทย์ที่ครูแจกวันนี้บ้าง ขอถ่ายรูปหน่อยครับ'},
+ {seat:21,time:'เมื่อวาน 16:45',text:'แบบฝึกหัดคณิตหน้า 88 ข้อ 7 ครูบอกว่าให้ข้ามได้'}
+];
+
+var state={date:TODAY,admin:null,student:null,editingId:null,pending:[],overMonths:3};
+function load(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function save(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
+state.admin=load('mock-admin');
+var sc=load('mock-student'); if(sc&&/^101\d\d$/.test(sc))state.student=sc;
+
+var toastTimer;
+function toast(t){var el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.hidden=true},2600)}
+function relDue(due){
+  var n=diffDays(due,TODAY);
+  if(n===0)return 'วันนี้'; if(n===1)return 'พรุ่งนี้'; if(n>1)return 'อีก '+n+' วัน';
+  return 'เลยมา '+(-n)+' วัน';
+}
+function kb(n){return n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB'}
+
+/* ---------- render ---------- */
+function renderToday(){
+  var d=parse(TODAY);
+  $('todayLabel').textContent='วัน'+DAYS[d.getDay()]+'ที่ '+fmt(TODAY);
+}
+function cardHtml(e){
+  var s=subj(e.sid);
+  var tools=state.admin?'<div class="tools"><button type="button" data-edit="'+e.id+'" aria-label="แก้ไข" title="แก้ไข">✎</button><button type="button" data-del="'+e.id+'" aria-label="ลบ" title="ลบ">🗑</button></div>':'';
+  var pics=e.photos.length?'<div class="pics">'+e.photos.map(function(u){return '<img src="'+u+'" alt="รูปแนบ">'}).join('')+'</div>':'';
+  var hw=e.hw
+    ?'<div class="chips"><span class="chip">⚠ มีการบ้าน</span><span class="chip due">📅 ส่ง: '+fmt(e.due)+'</span></div><p><b>🎯 โจทย์การบ้าน:</b> '+esc(e.detail)+'</p>'
+    :'<div class="nohw">✓ ไม่มีการบ้าน</div>';
+  return '<article class="card'+(e.hw?' hw':'')+'">'+tools+'<h3>'+esc(s.code+' '+s.name)+'</h3><p><b>📝 งานในคาบ:</b> '+esc(e.lesson)+'</p>'+pics+hw+'<div class="byline">บันทึกโดย '+esc(e.author)+'</div></article>';
+}
+function renderCards(){
+  $('pickDate').value=state.date;
+  var list=entries.filter(function(e){return e.date===state.date}).sort(function(a,b){return subjects.indexOf(subj(a.sid))-subjects.indexOf(subj(b.sid))});
+  $('cards').innerHTML=list.length?list.map(cardHtml).join(''):'<div class="empty" style="grid-column:1/-1">ยังไม่มีบันทึกของวันที่ '+fmt(state.date)+'</div>';
+}
+function itemHtml(e,late){
+  var s=subj(e.sid);
+  return '<div class="item"><div><b>'+esc(s.code+' '+s.name)+'</b><p>'+esc(e.detail)+'</p><span class="byline">ส่ง '+fmt(e.due)+'</span></div><span class="chip '+(late?'late':'due')+'">'+relDue(e.due)+'</span></div>';
+}
+function renderUpcoming(){
+  var list=entries.filter(function(e){return e.hw&&e.due>=TODAY}).sort(function(a,b){return a.due<b.due?-1:a.due>b.due?1:0});
+  $('upcoming').innerHTML=list.length?list.map(function(e){return itemHtml(e,false)}).join(''):'<div class="empty">🎉 ยอดเยี่ยมมาก! ไม่มีการบ้านค้างเลยครับ</div>';
+}
+function renderOverdue(){
+  var list=entries.filter(function(e){return e.hw&&e.due<TODAY}).sort(function(a,b){return a.due<b.due?1:a.due>b.due?-1:0});
+  $('overTitle').textContent='⏰ งานเลยกำหนดส่ง ('+list.length+')';
+  if(!list.length){$('overBody').innerHTML='<div class="empty" style="margin-top:4px">ไม่มีงานที่เลยกำหนด</div>';return}
+  var groups={},order=[];
+  list.forEach(function(e){var k=e.due.slice(0,7);if(!groups[k]){groups[k]=[];order.push(k)}groups[k].push(e)});
+  var shown=order.slice(0,state.overMonths);
+  var html=shown.map(function(k){
+    var y=k.slice(0,4),m=Number(k.slice(5,7))-1;
+    return '<div class="month"><span>'+MONTHS[m]+' '+y+'</span><span>'+groups[k].length+' งาน</span></div><div class="list">'+groups[k].map(function(e){return itemHtml(e,true)}).join('')+'</div>';
+  }).join('');
+  if(order.length>shown.length)html+='<button class="btn alt more" id="moreMonths" type="button">ดูเดือนก่อนหน้า ('+(order.length-shown.length)+' เดือน)</button>';
+  $('overBody').innerHTML=html;
+}
+function renderNotes(){
+  $('notes').innerHTML=notes.map(function(n){return '<div class="note"><header><b>เลขที่ '+n.seat+'</b> · '+esc(n.time)+'</header><p>'+esc(n.text)+'</p></div>'}).join('');
+}
+function renderAll(){renderToday();renderCards();renderUpcoming();renderOverdue();renderNotes()}
+
+/* ---------- form ---------- */
+function fillSubjects(){
+  $('fsubject').innerHTML='<option value="">-- เลือกวิชา --</option>'+subjects.map(function(s){return '<option value="'+s.id+'">'+esc(s.code+' '+s.name)+'</option>'}).join('');
+}
+function showPanelState(){
+  var ok=!!state.admin;
+  $('identify').hidden=ok; $('entryForm').hidden=!ok;
+  if(ok)$('whoName').textContent=state.admin;
+}
+function openPanel(open){
+  $('panel').hidden=!open;
+  $('toggle').setAttribute('aria-expanded',open?'true':'false');
+  if(open){showPanelState();(state.admin?$('fsubject'):$('idname')).focus()}
+}
+function resetFields(){
+  $('flesson').value='';$('fhw').value='0';$('fdetail').value='';$('fdue').value='';
+  $('hwFields').hidden=true;state.pending=[];renderThumbs();
+}
+function syncForm(){
+  var d=$('fdate').value,s=$('fsubject').value;
+  var ex=entries.filter(function(e){return e.date===d&&e.sid===s})[0];
+  if(ex){
+    if(state.editingId!==ex.id){
+      state.editingId=ex.id;
+      $('flesson').value=ex.lesson;$('fhw').value=ex.hw?'1':'0';$('fdetail').value=ex.detail;$('fdue').value=ex.due;
+      $('hwFields').hidden=!ex.hw;state.pending=ex.photos.map(function(u){return {url:u,existing:true}});renderThumbs();
+    }
+  }else if(state.editingId!==null){
+    state.editingId=null;resetFields();
+  }
+  $('editNote').hidden=state.editingId===null;
+  $('save').textContent=state.editingId===null?'บันทึกข้อมูล':'บันทึกการแก้ไข';
+  $('formTitle').textContent=state.editingId===null?'ฟอร์มบันทึกข้อมูล':'แก้ไขข้อมูลที่บันทึกไว้';
+}
+function renderThumbs(){
+  $('thumbs').innerHTML=state.pending.map(function(p,i){
+    return '<div class="thumb"><img src="'+p.url+'" alt=""><span>'+(p.existing?'รูปที่แนบไว้':'ย่อแล้ว')+(p.after?'<small>'+kb(p.before)+' → '+kb(p.after)+'</small>':'')+'</span><button type="button" class="linkbtn" data-rm="'+i+'" aria-label="เอารูปออก">✕</button></div>';
+  }).join('');
+}
+async function shrink(file){
+  var bmp=await createImageBitmap(file,{imageOrientation:'from-image'});
+  var k=Math.min(1,1600/Math.max(bmp.width,bmp.height));
+  var w=Math.round(bmp.width*k),h=Math.round(bmp.height*k);
+  var c=document.createElement('canvas');c.width=w;c.height=h;
+  c.getContext('2d').drawImage(bmp,0,0,w,h);
+  var blob=await new Promise(function(r){c.toBlob(r,'image/webp',.8)});
+  if(!blob||blob.type!=='image/webp')blob=await new Promise(function(r){c.toBlob(r,'image/jpeg',.8)});
+  return {url:URL.createObjectURL(blob),before:file.size,after:blob.size};
+}
+
+/* ---------- events ---------- */
+$('toggle').addEventListener('click',function(){openPanel($('panel').hidden)});
+$('idgo').addEventListener('click',function(){
+  var n=$('idname').value.trim(),p=$('idpin').value.trim();
+  if(!n){$('iderr').textContent='กรุณากรอกชื่อผู้บันทึก';return}
+  if(p!==PIN){$('iderr').textContent='รหัสแอดมินห้องไม่ถูกต้อง ลองใหม่อีกครั้ง';return}
+  $('iderr').textContent='';state.admin=n;save('mock-admin',n);$('idpin').value='';
+  showPanelState();renderCards();toast('ยินดีต้อนรับ '+n+' · จำเครื่องนี้ไว้แล้ว');$('fsubject').focus();
+});
+$('notme').addEventListener('click',function(){state.admin=null;save('mock-admin',null);showPanelState();renderCards();$('idname').focus()});
+$('fdate').addEventListener('change',function(){if(!$('fdue').value&&$('fhw').value==='1')$('fdue').value=addDays($('fdate').value,1);syncForm()});
+$('fsubject').addEventListener('change',syncForm);
+$('fhw').addEventListener('change',function(){
+  var on=$('fhw').value==='1';$('hwFields').hidden=!on;
+  if(on&&!$('fdue').value)$('fdue').value=addDays($('fdate').value||TODAY,1);
+});
+$('fphotos').addEventListener('change',async function(ev){
+  var files=Array.prototype.slice.call(ev.target.files);ev.target.value='';
+  $('formerr').textContent='';
+  for(var i=0;i<files.length;i++){
+    if(state.pending.length>=3){$('formerr').textContent='แนบได้ไม่เกิน 3 รูป';break}
+    try{state.pending.push(await shrink(files[i]))}
+    catch(e){$('formerr').textContent='เครื่องนี้อ่านรูป '+files[i].name+' ไม่ได้ ลองเลือกรูปอื่น'}
+  }
+  renderThumbs();
+});
+$('thumbs').addEventListener('click',function(ev){
+  var b=ev.target.closest('[data-rm]');if(!b)return;
+  state.pending.splice(Number(b.getAttribute('data-rm')),1);renderThumbs();
+});
+$('entryForm').addEventListener('submit',function(ev){
+  ev.preventDefault();
+  var d=$('fdate').value,s=$('fsubject').value,l=$('flesson').value.trim(),hw=$('fhw').value==='1';
+  var det=$('fdetail').value.trim(),due=$('fdue').value;
+  if(!d||!s||!l){$('formerr').textContent='กรุณากรอกวันที่ วิชา และสิ่งที่เรียน';return}
+  if(hw&&(!det||!due)){$('formerr').textContent='มีการบ้าน: กรุณากรอกโจทย์และวันที่ส่ง';return}
+  $('formerr').textContent='';
+  var photos=state.pending.map(function(p){return p.url});
+  var ex=entries.filter(function(e){return e.id===state.editingId})[0];
+  if(ex){ex.lesson=l;ex.hw=hw?1:0;ex.detail=hw?det:'';ex.due=hw?due:'';ex.photos=photos;ex.author=state.admin}
+  else entries.push({id:nextId++,date:d,sid:s,lesson:l,hw:hw?1:0,detail:hw?det:'',due:hw?due:'',author:state.admin,photos:photos});
+  var wasEdit=!!ex;
+  state.date=d;state.editingId=null;$('fsubject').value='';resetFields();syncForm();renderAll();
+  toast(wasEdit?'แก้ไขเรียบร้อย':'บันทึกเรียบร้อย');
+  $('cards').scrollIntoView({behavior:'smooth',block:'start'});
+});
+$('pickDate').addEventListener('change',function(){if($('pickDate').value){state.date=$('pickDate').value;renderCards()}});
+$('prevDay').addEventListener('click',function(){state.date=addDays(state.date,-1);renderCards()});
+$('nextDay').addEventListener('click',function(){state.date=addDays(state.date,1);renderCards()});
+$('goToday').addEventListener('click',function(){state.date=TODAY;renderCards()});
+var delTimer;
+$('cards').addEventListener('click',function(ev){
+  var ed=ev.target.closest('[data-edit]'),dl=ev.target.closest('[data-del]');
+  if(ed){
+    var e=entries.filter(function(x){return x.id===Number(ed.getAttribute('data-edit'))})[0];
+    openPanel(true);state.editingId=null;$('fdate').value=e.date;$('fsubject').value=e.sid;syncForm();
+    $('panel').scrollIntoView({behavior:'smooth',block:'start'});
+  }else if(dl){
+    if(dl.classList.contains('sure')){
+      entries=entries.filter(function(x){return x.id!==Number(dl.getAttribute('data-del'))});renderAll();toast('ลบแล้ว');
+    }else{
+      dl.classList.add('sure');dl.textContent='ยืนยันลบ?';
+      clearTimeout(delTimer);delTimer=setTimeout(renderCards,3000);
+    }
+  }
+});
+$('overBody').addEventListener('click',function(ev){
+  if(ev.target.id==='moreMonths'){state.overMonths+=3;renderOverdue()}
+});
+$('noteToggle').addEventListener('click',function(){
+  var open=$('noteForm').hidden;$('noteForm').hidden=!open;
+  $('noteToggle').setAttribute('aria-expanded',open?'true':'false');
+  if(open){if(state.student)$('ncode').value=state.student;($('ncode').value?$('ntext'):$('ncode')).focus()}
+});
+$('noteForm').addEventListener('submit',function(ev){
+  ev.preventDefault();
+  var c=$('ncode').value.trim(),t=$('ntext').value.trim();
+  if(!/^101(0[1-9]|[12]\d|30)$/.test(c)){$('nerr').textContent='ไม่พบรหัสนักเรียนนี้ในห้อง (ตัวอย่าง: 10101–10130)';return}
+  if(!t){$('nerr').textContent='กรุณาเขียนข้อความ';return}
+  $('nerr').textContent='';state.student=c;save('mock-student',c);
+  var now=new Date();
+  notes.unshift({seat:Number(c.slice(3)),time:'ตอนนี้ '+pad(now.getHours())+':'+pad(now.getMinutes()),text:t});
+  $('ntext').value='';renderNotes();toast('โพสต์แล้ว · เลขที่ '+Number(c.slice(3)));
+});
+
+/* ---------- init ---------- */
+fillSubjects();$('fdate').value=TODAY;renderAll();
+})();
+</script>
+
+</html>
