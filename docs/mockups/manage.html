@@ -38,7 +38,7 @@ h2{font-family:var(--font-display);font-weight:600;font-size:19px;margin:0 0 4px
 button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 label{display:block;font-weight:700;margin:14px 0 5px}
-input[type=text],input[type=password],textarea{width:100%;min-height:46px;font-size:16px;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+input[type=text],input[type=password],input[type=date],textarea{width:100%;min-height:46px;font-size:16px;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
 textarea{min-height:96px;resize:vertical}
 .btn{border:0;border-radius:10px;padding:12px 16px;background:var(--ink);color:var(--accent);font-weight:700;cursor:pointer;width:100%;margin-top:14px;font-size:17px;min-height:48px}
 .btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--ink);width:auto;margin:0}
@@ -65,6 +65,11 @@ textarea{min-height:96px;resize:vertical}
 .rtools button,.ibtn{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:0;width:100%;height:44px;padding:0 4px;cursor:pointer;font-size:16px}
 .rtools button.sure{background:var(--danger);color:#fff;border-color:var(--danger);font-size:14px;font-weight:700}
 .rtools button:disabled{opacity:.35;cursor:not-allowed}
+.rtools.flex{display:flex;flex-wrap:wrap;gap:8px}
+.rtools.flex button{width:auto;min-width:44px;padding:0 14px}
+.check{display:flex;gap:10px;align-items:center;font-weight:500;margin:14px 0 0;min-height:44px}
+.check input{width:22px;height:22px;flex:none}
+.steps{margin:8px 0 0;padding-left:20px;font-size:14px;color:var(--muted)}
 .pill{display:inline-block;font-size:12px;border-radius:99px;padding:0 9px;background:var(--panel);color:var(--muted);margin-left:6px}
 .seat{display:inline-grid;place-items:center;min-width:44px;height:30px;padding:0 8px;border-radius:8px;background:var(--ink);color:var(--accent);font-weight:700;margin-right:8px}
 .editgrid{display:grid;grid-template-columns:1fr;gap:8px}
@@ -85,6 +90,9 @@ textarea{min-height:96px;resize:vertical}
   .rtools button{width:auto;min-width:44px;padding:0 10px}
   .editgrid{grid-template-columns:1fr 1fr auto}
   .editgrid .row2{grid-column:auto}
+  .editgrid.g3{grid-template-columns:1fr 1fr 1fr}
+  .editgrid.g3 .row2,.editgrid.g4 .row2{grid-column:1/-1}
+  .editgrid.g4{grid-template-columns:1fr 1fr}
   .btn{width:auto;padding-inline:28px}
 }
 </style>
@@ -125,6 +133,9 @@ textarea{min-height:96px;resize:vertical}
         <input type="text" id="scode" autocomplete="off" placeholder="เช่น ค21103">
         <label for="sname">ชื่อวิชา</label>
         <input type="text" id="sname" autocomplete="off" placeholder="เช่น คณิตศาสตร์ 1">
+        <label for="steach">ผู้สอน (ไม่ใส่ก็ได้)</label>
+        <input type="text" id="steach" autocomplete="off" placeholder="เช่น ครูสมศรี">
+        <p class="hint">ถ้าใส่ ชื่อผู้สอนจะแสดงเล็กๆ ที่การ์ดของวิชานี้ในหน้าหลัก (แก้ชื่อผู้สอนแล้ว การ์ดเก่าของวิชานี้จะแสดงชื่อใหม่ด้วย)</p>
         <p class="err" id="serr" role="alert"></p>
         <button class="btn" type="submit">เพิ่มวิชา</button>
       </form>
@@ -133,7 +144,7 @@ textarea{min-height:96px;resize:vertical}
     <!-- นักเรียน -->
     <section id="p-students" role="tabpanel" aria-labelledby="t-students" hidden>
       <h2>รายชื่อนักเรียน</h2>
-      <p class="hint">"รหัส" คือสิ่งที่นักเรียนกรอกตอนเขียนความคิดเห็น ระบบแสดงผลเป็น "เลขที่"</p>
+      <p class="hint">"รหัส" คือสิ่งที่นักเรียนกรอกตอนเขียนความคิดเห็น ระบบแสดงผลเป็น "เลขที่" · รายชื่อใช้ต่อข้ามปีได้ ความคิดเห็นเก่าเก็บเลขที่ตอนโพสต์ไว้ แก้เลขที่ทีหลังไม่กระทบของเก่า</p>
       <div class="stats" id="stStats"></div>
       <label for="sfilter" style="margin-top:12px">ค้นหา</label>
       <input type="text" id="sfilter" autocomplete="off" placeholder="เลขที่ หรือ รหัส">
@@ -150,11 +161,31 @@ textarea{min-height:96px;resize:vertical}
 
     <!-- ตั้งค่า -->
     <section id="p-settings" role="tabpanel" aria-labelledby="t-settings" hidden>
-      <form class="card" id="nameForm" style="margin-top:0">
-        <h2>ชื่อห้อง</h2>
-        <label for="cname" class="sr" style="margin-top:8px">ชื่อห้องที่แสดงด้านบนของหน้าหลัก</label>
-        <input type="text" id="cname" autocomplete="off">
-        <button class="btn" type="submit">บันทึกชื่อห้อง</button>
+      <div class="card" style="margin-top:0">
+        <h2>ภาคเรียน</h2>
+        <p class="hint" style="margin-top:2px">หน้าหลักแสดงเฉพาะข้อมูลของ "ภาคเรียนปัจจุบัน" และใช้ชื่อห้องของภาคเรียนนั้น ภาคเรียนเก่าไม่หาย ผู้ใช้เลือกดูย้อนหลังได้จากตัวเลือกภาคเรียนใต้แถบเลือกวัน</p>
+        <ul class="list" id="termList"></ul>
+      </div>
+      <form class="card add" id="termForm">
+        <h2>+ สร้างภาคเรียนใหม่</h2>
+        <label for="tnm">ชื่อภาคเรียน</label>
+        <input type="text" id="tnm" autocomplete="off" placeholder="เช่น ภาคเรียนที่ 1/2027">
+        <label for="tlb">ชื่อห้องในภาคเรียนนี้</label>
+        <input type="text" id="tlb" autocomplete="off" placeholder="เช่น ป.6/1">
+        <div class="editgrid g4" style="margin-top:2px">
+          <div><label for="tst">วันเปิดเทอม</label><input type="date" id="tst"></div>
+          <div><label for="ten">วันปิดเทอม</label><input type="date" id="ten"></div>
+        </div>
+        <label class="check" for="tcur"><input type="checkbox" id="tcur" checked> ตั้งเป็นภาคเรียนปัจจุบันเลย</label>
+        <div class="warn"><b>ขึ้นปีการศึกษาใหม่ ทำตามนี้</b>
+          <ol class="steps">
+            <li>สร้างภาคเรียนใหม่ด้านบน แล้วเปลี่ยนชื่อห้อง (เช่น ป.5/1 → ป.6/1)</li>
+            <li>แท็บ 🧒 นักเรียน: ซ่อนคนที่ย้ายออก เพิ่มคนใหม่ ปรับเลขที่ถ้าเปลี่ยน</li>
+            <li>แท็บ 📚 วิชา: ซ่อนวิชาที่ไม่เรียนแล้ว เพิ่มวิชาและผู้สอนของปีนี้</li>
+          </ol>
+          ข้อมูลปีเก่าอยู่ครบ ไม่ต้องลบอะไร</div>
+        <p class="err" id="terr" role="alert"></p>
+        <button class="btn" type="submit">สร้างภาคเรียน</button>
       </form>
 
       <form class="card" id="pinForm">
@@ -190,12 +221,25 @@ var toastTimer;
 function toast(t){var el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.hidden=true},2600)}
 
 var uid=100;
-var cls={name:'ป.5/1',pinVersion:1};
+var cls={pinVersion:1};
+var Y=new Date().getFullYear();
+function iso(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function pad(n){return String(n).padStart(2,'0')}
+function addDays(sv,n){var p=sv.split('-').map(Number),d=new Date(p[0],p[1]-1,p[2]);d.setDate(d.getDate()+n);return iso(d)}
+function fmt(sv){var p=sv.split('-');return p[2]+'/'+p[1]+'/'+p[0]}
+var TODAY=iso(new Date());
+var terms=[
+ {id:2,name:'ภาคเรียนที่ 2/'+Y,label:'ป.5/1',start:addDays(TODAY,-60),end:addDays(TODAY,90)},
+ {id:1,name:'ภาคเรียนที่ 1/'+Y,label:'ป.5/1',start:addDays(TODAY,-240),end:addDays(TODAY,-61)},
+ {id:0,name:'ภาคเรียนที่ 2/'+(Y-1),label:'ป.4/1',start:addDays(TODAY,-420),end:addDays(TODAY,-241)}
+];
+var curId=2;
+function curTerm(){return terms.filter(function(t){return t.id===curId})[0]}
 var subjects=[
- {id:1,code:'ค21103',name:'คณิตศาสตร์ 1',n:24,active:true},
- {id:2,code:'อ21103',name:'ภาษาอังกฤษเข้ม',n:21,active:true},
+ {id:1,code:'ค21103',name:'คณิตศาสตร์ 1',t:'ครูสมศรี',n:24,active:true},
+ {id:2,code:'อ21103',name:'ภาษาอังกฤษเข้ม',t:'ครู Anna',n:21,active:true},
  {id:3,code:'อ21213',name:'เสริมทักษะการฟัง-พูดภาษาอังกฤษ 1',n:12,active:true},
- {id:4,code:'ว21203',name:'คอมพิวเตอร์และการออกแบบเทคโนโลยี 1',n:18,active:true},
+ {id:4,code:'ว21203',name:'คอมพิวเตอร์และการออกแบบเทคโนโลยี 1',t:'ครูวิชัย',n:18,active:true},
  {id:5,code:'ก20913',name:'E-Com',n:9,active:true},
  {id:6,code:'ส21101',name:'สังคมศึกษา (ภาคเรียนที่ผ่านมา)',n:30,active:false}
 ];
@@ -206,7 +250,7 @@ var hidden=[
  {id:2,type:'ความคิดเห็น',title:'เลขที่ 8 ใต้การ์ด ค21103 · 22/10/2026',meta:'ซ่อนโดย ครูต้น'},
  {id:3,type:'ความคิดเห็น',title:'เลขที่ 19 ใต้การ์ด ว21203 · 18/10/2026',meta:'ซ่อนโดย แม่น้องมาย'}
 ];
-var st={admin:load('mock-admin'),tab:'subjects',editSub:null,editStu:null,filter:''};
+var st={admin:load('mock-admin'),tab:'subjects',editSub:null,editStu:null,editTerm:null,filter:''};
 
 /* ---------- gate + tabs ---------- */
 function showGate(){
@@ -235,12 +279,12 @@ function setTab(t){
 function renderSubjects(){
   var html=subjects.map(function(s,i){
     if(st.editSub===s.id){
-      return '<li class="row"><div class="editgrid" style="width:100%"><div><label for="ec" style="margin-top:0">รหัสวิชา</label><input type="text" id="ec" value="'+esc(s.code)+'" autocomplete="off"></div><div><label for="en" style="margin-top:0">ชื่อวิชา</label><input type="text" id="en" value="'+esc(s.name)+'" autocomplete="off"></div><div class="row2"><button class="btn" type="button" data-ssave="'+s.id+'">บันทึก</button><button class="btn alt" type="button" data-scancel="1">ยกเลิก</button></div></div></li>';
+      return '<li class="row"><div class="editgrid g3" style="width:100%"><div><label for="ec" style="margin-top:0">รหัสวิชา</label><input type="text" id="ec" value="'+esc(s.code)+'" autocomplete="off"></div><div><label for="en" style="margin-top:0">ชื่อวิชา</label><input type="text" id="en" value="'+esc(s.name)+'" autocomplete="off"></div><div><label for="et" style="margin-top:0">ผู้สอน (ไม่ใส่ก็ได้)</label><input type="text" id="et" value="'+esc(s.t||'')+'" autocomplete="off"></div><div class="row2"><button class="btn" type="button" data-ssave="'+s.id+'">บันทึก</button><button class="btn alt" type="button" data-scancel="1">ยกเลิก</button></div></div></li>';
     }
     var del=s.n===0
       ?'<button type="button" data-sdel="'+s.id+'" aria-label="ลบวิชา" title="ลบ">🗑</button>'
       :'<button type="button" disabled aria-label="ลบไม่ได้ เพราะมีบันทึกแล้ว" title="ลบไม่ได้ เพราะมีบันทึกแล้ว ให้ซ่อนแทน">🗑</button>';
-    return '<li class="row'+(s.active?'':' off')+'"><div class="rmain"><b>'+esc(s.code)+'</b> '+esc(s.name)+(s.active?'':'<span class="pill">ซ่อนอยู่</span>')+'<small>'+s.n+' บันทึก</small></div><div class="rtools">'
+    return '<li class="row'+(s.active?'':' off')+'"><div class="rmain"><b>'+esc(s.code)+'</b> '+esc(s.name)+(s.active?'':'<span class="pill">ซ่อนอยู่</span>')+'<small>'+s.n+' บันทึก'+(s.t?' · ผู้สอน '+esc(s.t):'')+'</small></div><div class="rtools">'
       +'<button type="button" data-sup="'+s.id+'" aria-label="เลื่อนขึ้น"'+(i===0?' disabled':'')+'>▲</button>'
       +'<button type="button" data-sdown="'+s.id+'" aria-label="เลื่อนลง"'+(i===subjects.length-1?' disabled':'')+'>▼</button>'
       +'<button type="button" data-sedit="'+s.id+'" aria-label="แก้ไข" title="แก้ไข">✎</button>'
@@ -261,7 +305,7 @@ $('subjList').addEventListener('click',function(ev){
     var s=subjects[subjIndex(+b.getAttribute('data-ssave'))],c=$('ec').value.trim(),n=$('en').value.trim();
     if(!c||!n){toast('กรุณากรอกรหัสวิชาและชื่อวิชา');return}
     if(subjects.some(function(o){return o!==s&&o.code.toLowerCase()===c.toLowerCase()})){toast('มีรหัสวิชา '+c+' อยู่แล้ว');return}
-    s.code=c;s.name=n;st.editSub=null;renderSubjects();toast('แก้ไขวิชาแล้ว');return}
+    s.code=c;s.name=n;s.t=$('et').value.trim();st.editSub=null;renderSubjects();toast('แก้ไขวิชาแล้ว');return}
   if((b=t.closest('[data-stog]'))){var q=subjects[subjIndex(+b.getAttribute('data-stog'))];q.active=!q.active;renderSubjects();toast(q.active?'แสดงวิชาแล้ว':'ซ่อนวิชาแล้ว บันทึกเก่ายังอยู่ครบ');return}
   if((b=t.closest('[data-sdel]'))){
     if(b.classList.contains('sure')){subjects.splice(subjIndex(+b.getAttribute('data-sdel')),1);renderSubjects();toast('ลบวิชาแล้ว')}
@@ -273,8 +317,8 @@ $('subjForm').addEventListener('submit',function(ev){
   var c=$('scode').value.trim(),n=$('sname').value.trim();
   if(!c||!n){$('serr').textContent='กรุณากรอกรหัสวิชาและชื่อวิชา';return}
   if(subjects.some(function(o){return o.code.toLowerCase()===c.toLowerCase()})){$('serr').textContent='มีรหัสวิชา '+c+' อยู่แล้ว';return}
-  $('serr').textContent='';subjects.push({id:++uid,code:c,name:n,n:0,active:true});
-  $('scode').value='';$('sname').value='';renderSubjects();toast('เพิ่มวิชา '+c+' แล้ว');
+  $('serr').textContent='';subjects.push({id:++uid,code:c,name:n,t:$('steach').value.trim(),n:0,active:true});
+  $('scode').value='';$('sname').value='';$('steach').value='';renderSubjects();toast('เพิ่มวิชา '+c+' แล้ว');
 });
 
 /* ---------- students ---------- */
@@ -325,7 +369,7 @@ $('stList').addEventListener('click',function(ev){
     var u=students.filter(function(x){return x.id===+b.getAttribute('data-usave')})[0];
     var r=parseBulk($('es').value.trim()+' '+$('ek').value.trim(),u.active?u.id:u.id)[0];
     if(r.err){toast(r.err);return}
-    u.seat=r.seat;u.code=r.code;st.editStu=null;renderStudents();toast('แก้ไขแล้ว · ความคิดเห็นเก่าของรหัสนี้จะแสดงเป็นเลขที่ '+u.seat);return}
+    u.seat=r.seat;u.code=r.code;st.editStu=null;renderStudents();toast('แก้ไขแล้ว · ความคิดเห็นเก่ายังแสดงเลขที่เดิมตอนที่โพสต์');return}
 });
 $('stBulk').addEventListener('input',function(){
   var res=parseBulk($('stBulk').value),ok=res.filter(function(r){return !r.err}).length;
@@ -344,11 +388,52 @@ $('stForm').addEventListener('submit',function(ev){
 });
 
 /* ---------- settings ---------- */
-function renderTitle(){$('title').textContent='จัดการห้อง '+cls.name;$('cname').value=cls.name;$('pinVer').textContent=cls.pinVersion}
-$('nameForm').addEventListener('submit',function(ev){
-  ev.preventDefault();var n=$('cname').value.trim();
-  if(!n){toast('กรุณากรอกชื่อห้อง');return}
-  cls.name=n;renderTitle();toast('บันทึกชื่อห้องแล้ว');
+function renderTitle(){$('title').textContent='จัดการห้อง '+curTerm().label;$('pinVer').textContent=cls.pinVersion}
+function validTerm(o,selfId){
+  if(!o.name||!o.label)return 'กรุณากรอกชื่อภาคเรียนและชื่อห้อง';
+  if(!o.start||!o.end)return 'กรุณาเลือกวันเปิดและปิดเทอม';
+  if(o.end<o.start)return 'วันปิดเทอมต้องไม่ก่อนวันเปิดเทอม';
+  var clash=terms.filter(function(t){return t.id!==selfId&&t.start<=o.end&&o.start<=t.end})[0];
+  if(clash)return 'ช่วงวันที่ทับกับ '+clash.name+' ('+fmt(clash.start)+' – '+fmt(clash.end)+')';
+  if(terms.some(function(t){return t.id!==selfId&&t.name.toLowerCase()===o.name.toLowerCase()}))return 'มีภาคเรียนชื่อนี้แล้ว';
+  return '';
+}
+function renderTerms(){
+  var sorted=terms.slice().sort(function(a,b){return a.start<b.start?1:-1});
+  $('termList').innerHTML=sorted.map(function(t){
+    if(st.editTerm===t.id){
+      return '<li class="row"><div class="editgrid g4" style="width:100%"><div><label for="xn" style="margin-top:0">ชื่อภาคเรียน</label><input type="text" id="xn" value="'+esc(t.name)+'" autocomplete="off"></div><div><label for="xl" style="margin-top:0">ชื่อห้อง</label><input type="text" id="xl" value="'+esc(t.label)+'" autocomplete="off"></div><div><label for="xs" style="margin-top:0">วันเปิดเทอม</label><input type="date" id="xs" value="'+t.start+'"></div><div><label for="xe" style="margin-top:0">วันปิดเทอม</label><input type="date" id="xe" value="'+t.end+'"></div><div class="row2"><button class="btn" type="button" data-tsave="'+t.id+'">บันทึก</button><button class="btn alt" type="button" data-tcancel="1">ยกเลิก</button></div></div></li>';
+    }
+    var cur=t.id===curId;
+    return '<li class="row'+(cur?'':' off')+'"><div class="rmain"><b>'+esc(t.name)+'</b> · '+esc(t.label)+(cur?'<span class="pill">ปัจจุบัน</span>':'')+'<small>'+fmt(t.start)+' – '+fmt(t.end)+'</small></div><div class="rtools flex"><button type="button" data-tedit="'+t.id+'" aria-label="แก้ไข" title="แก้ไข">✎</button>'+(cur?'':'<button type="button" data-tcur="'+t.id+'" style="font-size:14px;font-weight:700">ตั้งเป็นปัจจุบัน</button>')+'</div></li>';
+  }).join('');
+}
+function prefillTerm(){
+  if($('tnm').value||$('tst').value||$('ten').value)return;
+  var last=terms.slice().sort(function(a,b){return a.end<b.end?1:-1})[0];
+  var st0=addDays(last.end,1);
+  $('tst').value=st0;$('ten').value=addDays(st0,120);$('tlb').value=curTerm().label;
+}
+$('termList').addEventListener('click',function(ev){
+  var t=ev.target,b;
+  if((b=t.closest('[data-tedit]'))){st.editTerm=+b.getAttribute('data-tedit');renderTerms();$('xn').focus();return}
+  if((b=t.closest('[data-tcancel]'))){st.editTerm=null;renderTerms();return}
+  if((b=t.closest('[data-tcur]'))){var id=+b.getAttribute('data-tcur');curId=id;renderTerms();renderTitle();toast('ตั้ง '+curTerm().name+' เป็นภาคเรียนปัจจุบันแล้ว · หน้าหลักจะแสดงข้อมูลของภาคเรียนนี้');return}
+  if((b=t.closest('[data-tsave]'))){
+    var id2=+b.getAttribute('data-tsave'),o={name:$('xn').value.trim(),label:$('xl').value.trim(),start:$('xs').value,end:$('xe').value},er=validTerm(o,id2);
+    if(er){toast(er);return}
+    var tt=terms.filter(function(x){return x.id===id2})[0];tt.name=o.name;tt.label=o.label;tt.start=o.start;tt.end=o.end;
+    st.editTerm=null;renderTerms();renderTitle();toast('แก้ไขภาคเรียนแล้ว');
+  }
+});
+$('termForm').addEventListener('submit',function(ev){
+  ev.preventDefault();
+  var o={name:$('tnm').value.trim(),label:$('tlb').value.trim(),start:$('tst').value,end:$('ten').value},er=validTerm(o,null);
+  if(er){$('terr').textContent=er;return}
+  $('terr').textContent='';var id=++uid;terms.push({id:id,name:o.name,label:o.label,start:o.start,end:o.end});
+  if($('tcur').checked)curId=id;
+  $('tnm').value='';$('tst').value='';$('ten').value='';renderTerms();renderTitle();prefillTerm();
+  toast('สร้าง '+o.name+' แล้ว'+($('tcur').checked?' · เป็นภาคเรียนปัจจุบัน':''));
 });
 $('pinForm').addEventListener('submit',function(ev){
   ev.preventDefault();var a=$('npin').value.trim(),b=$('npin2').value.trim();
@@ -368,7 +453,7 @@ $('hidList').addEventListener('click',function(ev){
   var id=+b.getAttribute('data-restore');hidden=hidden.filter(function(h){return h.id!==id});renderHidden();toast('กู้คืนแล้ว');
 });
 
-function renderAll(){renderTitle();renderSubjects();renderStudents();renderHidden()}
+function renderAll(){renderTitle();renderTerms();prefillTerm();renderSubjects();renderStudents();renderHidden()}
 showGate();
 })();
 </script>

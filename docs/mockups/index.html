@@ -81,6 +81,11 @@ textarea{min-height:88px;resize:vertical}
 .chip.late{background:var(--danger);color:#fff}
 .nohw{margin-top:auto;color:var(--good);font-weight:700}
 .byline{font-size:12px;color:var(--muted)}
+.teacher{font-size:13px;color:var(--muted);margin-top:-4px}
+.termbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 2px 0;font-size:14px;color:var(--muted)}
+.termbar label{margin:0;font-weight:500}
+.termbar select{width:auto;max-width:100%;min-height:44px;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:6px 10px;font-size:15px}
+.warn{background:var(--hw-bg);border:1px solid var(--hw-line);border-radius:10px;padding:10px 14px;font-size:14px;margin-top:10px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .meta{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .tools{display:flex;gap:8px}
 .tools button{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:44px;height:44px;cursor:pointer;font-size:17px}
@@ -137,7 +142,7 @@ input[type=file]{width:100%;max-width:100%;min-width:0;font-size:14px}
 </style>
 
 <div class="wrap">
-  <h1>บันทึกการเรียนการสอน ป.5/1</h1>
+  <h1 id="title">บันทึกการเรียนการสอน</h1>
   <p class="sub" id="todayLabel"></p>
   <span class="mock">ตัวอย่างหน้าตา · ข้อมูลสมมติ</span>
   <hr class="rule">
@@ -190,10 +195,13 @@ input[type=file]{width:100%;max-width:100%;min-width:0;font-size:14px}
     <button class="btn" id="nextDay" type="button" aria-label="วันถัดไป">วันถัดไป ›</button>
   </div>
 
+  <div class="termbar" id="termbar"><label for="termSel">📂 ภาคเรียน:</label><select id="termSel"></select></div>
+  <div class="warn" id="pastBanner" hidden><span>กำลังดูข้อมูลย้อนหลัง · <b id="pastRange"></b></span><button class="linkbtn" id="backCur" type="button">กลับภาคเรียนปัจจุบัน</button></div>
+
   <h2>📚 สิ่งที่เรียน (ตามวันที่เลือก)</h2>
   <div class="grid" id="cards"></div>
 
-  <h2>📌 การบ้านที่ต้องส่ง (เรียงตามกำหนด)</h2>
+  <h2 id="hUpcoming">📌 การบ้านที่ต้องส่ง (เรียงตามกำหนด)</h2>
   <div class="list" id="upcoming"></div>
 
   <details class="over" id="overdue">
@@ -220,12 +228,20 @@ var fmt=function(s){var p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0]};
 var diffDays=function(a,b){return Math.round((parse(a)-parse(b))/86400000)};
 var esc=function(t){var d=document.createElement('div');d.textContent=t==null?'':String(t);return d.innerHTML};
 var TODAY=iso(new Date());
+var Y=TODAY.slice(0,4);
+var Y0=String(Number(Y)-1);
+var terms=[
+ {id:2,name:'ภาคเรียนที่ 2/'+Y,label:'ป.5/1',start:addDays(TODAY,-60),end:addDays(TODAY,90)},
+ {id:1,name:'ภาคเรียนที่ 1/'+Y,label:'ป.5/1',start:addDays(TODAY,-240),end:addDays(TODAY,-61)},
+ {id:0,name:'ภาคเรียนที่ 2/'+Y0,label:'ป.4/1',start:addDays(TODAY,-420),end:addDays(TODAY,-241)}
+];
+var CUR=2; /* ภาคเรียนปัจจุบัน: ตั้งโดยแอดมินในหน้าจัดการ */
 
 var subjects=[
- {id:'m',code:'ค21103',name:'คณิตศาสตร์ 1'},
- {id:'e',code:'อ21103',name:'ภาษาอังกฤษเข้ม'},
+ {id:'m',code:'ค21103',name:'คณิตศาสตร์ 1',t:'ครูสมศรี'},
+ {id:'e',code:'อ21103',name:'ภาษาอังกฤษเข้ม',t:'ครู Anna'},
  {id:'l',code:'อ21213',name:'เสริมทักษะการฟัง-พูดภาษาอังกฤษ 1'},
- {id:'c',code:'ว21203',name:'คอมพิวเตอร์และการออกแบบเทคโนโลยี 1'},
+ {id:'c',code:'ว21203',name:'คอมพิวเตอร์และการออกแบบเทคโนโลยี 1',t:'ครูวิชัย'},
  {id:'b',code:'ก20913',name:'E-Com'}
 ];
 var subj=function(id){return subjects.filter(function(s){return s.id===id})[0]};
@@ -256,6 +272,8 @@ seed(-55,'m','สมการเบื้องต้น','แบบฝึกห
 seed(-70,'b','Online shopping','สรุปข้อดีข้อเสียการซื้อของออนไลน์ 5 ข้อ',-61);
 seed(-88,'m','ตัวประกอบของจำนวนนับ','แบบฝึกหัด 1.2 หน้า 18',-75);
 seed(-110,'e','Unit 1 Greetings','ท่อง dialogue หน้า 8',-95);
+seed(-300,'m','การบวกลบจำนวนเต็ม','แบบฝึกหัด 5.1 หน้า 70',-296,'ครูต้น');
+seed(-330,'c','ส่วนประกอบของคอมพิวเตอร์','วาดภาพส่วนประกอบพร้อมชื่อ',-326,'ครูต้น');
 
 ent(0,'m').photos=[mkPhoto('โจทย์บนกระดาน',35),mkPhoto('หนังสือ หน้า 195',200)];
 ent(0,'c').photos=[mkPhoto('ตัวอย่างงานใน Canva',280)];
@@ -267,7 +285,7 @@ ent(0,'m').comments=[
 ent(0,'c').comments=[{seat:21,time:'วันนี้ 13:05',text:'ส่งใน Google Classroom ตรงนี้ https://classroom.google.com/c/example123 ก่อน 23.59 นะ',photos:[]}];
 ent(-1,'m').comments=[{seat:8,time:'เมื่อวาน 18:02',text:'ข้อ 7 ครูบอกว่าข้ามได้ครับ',photos:[]}];
 
-var state={open:{},cpend:{},date:TODAY,admin:null,student:null,editingId:null,pending:[],overMonths:3};
+var state={term:CUR,open:{},cpend:{},date:TODAY,admin:null,student:null,editingId:null,pending:[],overMonths:3};
 function load(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function save(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
 state.admin=load('mock-admin');
@@ -283,9 +301,21 @@ function relDue(due){
 function kb(n){return n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB'}
 
 /* ---------- render ---------- */
+function termOf(id){return terms.filter(function(t){return t.id===id})[0]}
+function viewTerm(){return termOf(state.term)}
+function clampDate(d){var t=viewTerm();return d<t.start?t.start:d>t.end?t.end:d}
+function inView(e){var t=viewTerm();return e.date>=t.start&&e.date<=t.end}
+function renderTerm(){
+  var past=state.term!==CUR,t=viewTerm();
+  $('termSel').innerHTML=terms.slice().sort(function(a,b){return a.start<b.start?1:-1}).map(function(x){return '<option value="'+x.id+'"'+(x.id===state.term?' selected':'')+'>'+esc(x.name+' · '+x.label)+(x.id===CUR?' (ปัจจุบัน)':'')+'</option>'}).join('');
+  $('title').textContent='บันทึกการเรียนการสอน '+termOf(CUR).label;
+  $('termbar').hidden=terms.length<2;
+  $('pastBanner').hidden=!past;$('hUpcoming').hidden=past;$('upcoming').hidden=past;
+  $('pastRange').textContent=past?t.label+' · '+t.name+' · '+fmt(t.start)+' – '+fmt(t.end):'';
+}
 function renderToday(){
   var d=parse(TODAY);
-  $('todayLabel').textContent='วัน'+DAYS[d.getDay()]+'ที่ '+fmt(TODAY);
+  $('todayLabel').textContent='วัน'+DAYS[d.getDay()]+'ที่ '+fmt(TODAY)+' · '+termOf(CUR).name;
 }
 /* escape first, then turn http(s) links into chips; ASCII-only URL chars so Thai text right after a link is not swallowed */
 function linkLabel(u){
@@ -320,15 +350,15 @@ function commentsHtml(e){
 }
 function cardHtml(e){
   var s=subj(e.sid);
-  var tools=state.admin?'<div class="tools"><button type="button" data-edit="'+e.id+'" aria-label="แก้ไข" title="แก้ไข">✎</button><button type="button" data-del="'+e.id+'" aria-label="ลบ" title="ลบ">🗑</button></div>':'';
+  var tools=(state.admin&&state.term===CUR)?'<div class="tools"><button type="button" data-edit="'+e.id+'" aria-label="แก้ไข" title="แก้ไข">✎</button><button type="button" data-del="'+e.id+'" aria-label="ลบ" title="ลบ">🗑</button></div>':'';
   var pics=e.photos.length?picsHtml(e.photos):'';
   var hw=e.hw
     ?'<div class="chips"><span class="chip">⚠ มีการบ้าน</span><span class="chip due">📅 ส่ง: '+fmt(e.due)+'</span></div><p><b>🎯 โจทย์การบ้าน:</b> '+linkify(e.detail)+'</p>'
     :'<div class="nohw">✓ ไม่มีการบ้าน</div>';
-  return '<article class="card'+(e.hw?' hw':'')+'"><h3>'+esc(s.code+' '+s.name)+'</h3><p><b>📝 งานในคาบ:</b> '+linkify(e.lesson)+'</p>'+pics+hw+'<div class="meta"><span class="byline">บันทึกโดย '+esc(e.author)+'</span>'+tools+'</div><button class="cbtn" type="button" data-ctoggle="'+e.id+'" aria-expanded="'+(state.open[e.id]?'true':'false')+'">💬 '+e.comments.length+' <span>ความคิดเห็น</span><i>'+(state.open[e.id]?'▾ ย่อ':'▸ อ่าน / เขียน')+'</i></button>'+(state.open[e.id]?commentsHtml(e):'')+'</article>';
+  return '<article class="card'+(e.hw?' hw':'')+'"><h3>'+esc(s.code+' '+s.name)+'</h3>'+(s.t?'<div class="teacher">ผู้สอน: '+esc(s.t)+'</div>':'')+'<p><b>📝 งานในคาบ:</b> '+linkify(e.lesson)+'</p>'+pics+hw+'<div class="meta"><span class="byline">บันทึกโดย '+esc(e.author)+'</span>'+tools+'</div><button class="cbtn" type="button" data-ctoggle="'+e.id+'" aria-expanded="'+(state.open[e.id]?'true':'false')+'">💬 '+e.comments.length+' <span>ความคิดเห็น</span><i>'+(state.open[e.id]?'▾ ย่อ':'▸ อ่าน / เขียน')+'</i></button>'+(state.open[e.id]?commentsHtml(e):'')+'</article>';
 }
 function renderCards(){
-  $('pickDate').value=state.date;
+  var vt=viewTerm();$('pickDate').min=vt.start;$('pickDate').max=vt.end;$('pickDate').value=state.date;
   var list=entries.filter(function(e){return e.date===state.date}).sort(function(a,b){return subjects.indexOf(subj(a.sid))-subjects.indexOf(subj(b.sid))});
   $('cards').innerHTML=list.length?list.map(cardHtml).join(''):'<div class="empty" style="grid-column:1/-1">ยังไม่มีบันทึกของวันที่ '+fmt(state.date)+'</div>';
 }
@@ -337,11 +367,11 @@ function itemHtml(e,late){
   return '<div class="item"><div><b>'+esc(s.code+' '+s.name)+'</b><p>'+linkify(e.detail)+'</p><span class="byline">ส่ง '+fmt(e.due)+'</span></div><span class="chip '+(late?'late':'due')+'">'+relDue(e.due)+'</span></div>';
 }
 function renderUpcoming(){
-  var list=entries.filter(function(e){return e.hw&&e.due>=TODAY}).sort(function(a,b){return a.due<b.due?-1:a.due>b.due?1:0});
+  var list=entries.filter(function(e){return inView(e)&&e.hw&&e.due>=TODAY}).sort(function(a,b){return a.due<b.due?-1:a.due>b.due?1:0});
   $('upcoming').innerHTML=list.length?list.map(function(e){return itemHtml(e,false)}).join(''):'<div class="empty">🎉 ยอดเยี่ยมมาก! ไม่มีการบ้านค้างเลยครับ</div>';
 }
 function renderOverdue(){
-  var list=entries.filter(function(e){return e.hw&&e.due<TODAY}).sort(function(a,b){return a.due<b.due?1:a.due>b.due?-1:0});
+  var list=entries.filter(function(e){return inView(e)&&e.hw&&e.due<TODAY}).sort(function(a,b){return a.due<b.due?1:a.due>b.due?-1:0});
   $('overTitle').textContent='⏰ งานเลยกำหนดส่ง ('+list.length+')';
   if(!list.length){$('overBody').innerHTML='<div class="empty" style="margin-top:4px">ไม่มีงานที่เลยกำหนด</div>';return}
   var groups={},order=[];
@@ -354,7 +384,7 @@ function renderOverdue(){
   if(order.length>shown.length)html+='<button class="btn alt more" id="moreMonths" type="button">ดูเดือนก่อนหน้า ('+(order.length-shown.length)+' เดือน)</button>';
   $('overBody').innerHTML=html;
 }
-function renderAll(){renderToday();renderCards();renderUpcoming();renderOverdue()}
+function renderAll(){renderTerm();renderToday();renderCards();renderUpcoming();renderOverdue()}
 
 /* ---------- form ---------- */
 function fillSubjects(){
@@ -441,6 +471,8 @@ $('entryForm').addEventListener('submit',function(ev){
   var d=$('fdate').value,s=$('fsubject').value,l=$('flesson').value.trim(),hw=$('fhw').value==='1';
   var det=$('fdetail').value.trim(),due=$('fdue').value;
   if(!d||!s||!l){$('formerr').textContent='กรุณากรอกวันที่ วิชา และสิ่งที่เรียน';return}
+  var ct=termOf(CUR);
+  if(d<ct.start||d>ct.end){$('formerr').textContent='วันที่อยู่นอก'+ct.name+' ('+fmt(ct.start)+' – '+fmt(ct.end)+') เลือกวันที่ในภาคเรียนปัจจุบัน';return}
   if(hw&&(!det||!due)){$('formerr').textContent='มีการบ้าน: กรุณากรอกโจทย์และวันที่ส่ง';return}
   $('formerr').textContent='';
   var photos=state.pending.map(function(p){return p.url});
@@ -448,14 +480,21 @@ $('entryForm').addEventListener('submit',function(ev){
   if(ex){ex.lesson=l;ex.hw=hw?1:0;ex.detail=hw?det:'';ex.due=hw?due:'';ex.photos=photos;ex.author=state.admin}
   else entries.push({id:nextId++,date:d,sid:s,lesson:l,hw:hw?1:0,detail:hw?det:'',due:hw?due:'',author:state.admin,photos:photos});
   var wasEdit=!!ex;
-  state.date=d;state.editingId=null;$('fsubject').value='';resetFields();syncForm();renderAll();
+  state.term=CUR;state.date=d;state.editingId=null;$('fsubject').value='';resetFields();syncForm();renderAll();
   toast(wasEdit?'แก้ไขเรียบร้อย':'บันทึกเรียบร้อย');
   $('cards').scrollIntoView({behavior:'smooth',block:'start'});
 });
-$('pickDate').addEventListener('change',function(){if($('pickDate').value){state.date=$('pickDate').value;renderCards()}});
-$('prevDay').addEventListener('click',function(){state.date=addDays(state.date,-1);renderCards()});
-$('nextDay').addEventListener('click',function(){state.date=addDays(state.date,1);renderCards()});
-$('goToday').addEventListener('click',function(){state.date=TODAY;renderCards()});
+$('pickDate').addEventListener('change',function(){if($('pickDate').value){state.date=clampDate($('pickDate').value);renderCards()}});
+$('prevDay').addEventListener('click',function(){state.date=clampDate(addDays(state.date,-1));renderCards()});
+$('nextDay').addEventListener('click',function(){state.date=clampDate(addDays(state.date,1));renderCards()});
+$('goToday').addEventListener('click',function(){state.term=CUR;state.date=TODAY;renderAll()});
+function switchTerm(id){
+  state.term=id;
+  var ds=entries.filter(inView).map(function(e){return e.date}).sort();
+  state.date=id===CUR?clampDate(TODAY):(ds.length?ds[ds.length-1]:viewTerm().end); /* old term opens on its last day that has records */
+state.overMonths=3;$('overdue').open=false;renderAll()}
+$('termSel').addEventListener('change',function(){switchTerm(Number($('termSel').value))});
+$('backCur').addEventListener('click',function(){switchTerm(CUR)});
 var delTimer;
 $('cards').addEventListener('click',function(ev){
   var t=ev.target,ed=t.closest('[data-edit]'),dl=t.closest('[data-del]'),ct=t.closest('[data-ctoggle]'),z=t.closest('[data-zoom]'),rm=t.closest('[data-crm]');
@@ -505,7 +544,7 @@ $('overBody').addEventListener('click',function(ev){
   if(ev.target.id==='moreMonths'){state.overMonths+=3;renderOverdue()}
 });
 /* ---------- init ---------- */
-fillSubjects();$('fdate').value=TODAY;renderAll();
+fillSubjects();$('fdate').min=termOf(CUR).start;$('fdate').max=termOf(CUR).end;$('fdate').value=TODAY;renderAll();
 })();
 </script>
 
