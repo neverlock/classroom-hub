@@ -6,7 +6,7 @@ import { useEnv } from '#lib/server/env.js';
 import { iterationsFor } from '#lib/server/room.js';
 import { setSuperCookie } from '#lib/server/session.js';
 import { addDays, todayInBangkok } from '#lib/dates.js';
-import { clampText, validateAdminInput, validatePassword, validateSlug, validateTerm } from '#lib/validate.js';
+import { readText, validateAdminInput, validatePassword, validateSlug, validateTerm } from '#lib/validate.js';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -61,8 +61,8 @@ export const actions: Actions = {
 		const { db, env } = useEnv(event);
 		const f = await event.request.formData();
 		const slug = String(f.get('slug') ?? '').trim().toLowerCase();
-		const term = { name: clampText(f.get('term'), 60), classLabel: clampText(f.get('label'), 40), startDate: String(f.get('start') ?? ''), endDate: String(f.get('end') ?? '') };
-		const display = clampText(f.get('display'), 30);
+		const term = { name: readText(f.get('term')), classLabel: readText(f.get('label')), startDate: String(f.get('start') ?? ''), endDate: String(f.get('end') ?? '') };
+		const display = readText(f.get('display'));
 		const username = String(f.get('username') ?? '').trim().toLowerCase();
 		const password = String(f.get('password') ?? '');
 		const err = validateSlug(slug) ?? validateTerm(term, []) ?? validateAdminInput(display, username, password);
@@ -104,7 +104,7 @@ export const actions: Actions = {
 		const { db, env } = useEnv(event);
 		const f = await event.request.formData();
 		const roomId = num(f.get('roomId'));
-		const display = clampText(f.get('display'), 30);
+		const display = readText(f.get('display'));
 		const username = String(f.get('username') ?? '').trim().toLowerCase();
 		const password = String(f.get('password') ?? '');
 		const room = await db.select().from(classes).where(eq(classes.id, roomId)).get();

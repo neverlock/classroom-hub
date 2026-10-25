@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	lengthError,
 	parseStudentLines,
 	suggestNextTerm,
 	validateAdminInput,
@@ -87,5 +88,12 @@ describe('parseStudentLines', () => {
 	it('lets a student keep their own seat and code when editing', () => {
 		const r = parseStudentLines('1 10101', existing, 1);
 		expect(r[0].error).toBeUndefined();
+	});
+});
+
+describe('lengthError', () => {
+	it('reports the first field that is too long instead of cutting it', () => {
+		expect(lengthError([['รหัสวิชา', 'ค21103', 20], ['ชื่อวิชา', 'x', 100]])).toBeNull();
+		expect(lengthError([['รหัสวิชา', 'English Communication', 20]])).toMatch(/รหัสวิชา.*20.*21/);
 	});
 });

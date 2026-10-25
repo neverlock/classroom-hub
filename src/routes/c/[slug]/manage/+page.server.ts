@@ -3,7 +3,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { classAdmins, classes, comments, entries, students, subjects, terms } from '#lib/server/db/schema.js';
 import { adminContext, forgetStudentAction, loginAction, logoutAction, roomContext } from '#lib/server/room.js';
 import { loadSubjects } from '#lib/server/queries.js';
-import { clampText, parseStudentLines, suggestNextTerm, validateTerm } from '#lib/validate.js';
+import { lengthError, parseStudentLines, readText, suggestNextTerm, validateTerm } from '#lib/validate.js';
 import { todayInBangkok } from '#lib/dates.js';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -76,10 +76,12 @@ export const actions: Actions = {
 		const { ctx, denied } = await adminContext(event);
 		if (denied) return denied;
 		const f = await event.request.formData();
-		const code = clampText(f.get('code'), 20);
-		const name = clampText(f.get('name'), 100);
-		const teacher = clampText(f.get('teacher'), 60);
+		const code = readText(f.get('code'));
+		const name = readText(f.get('name'));
+		const teacher = readText(f.get('teacher'));
 		if (!code || !name) return fail(400, { error: 'กรุณากรอกรหัสวิชาและชื่อวิชา' });
+		const tooLong = lengthError([['รหัสวิชา', code, 20], ['ชื่อวิชา', name, 100], ['ผู้สอน', teacher, 60]]);
+		if (tooLong) return fail(400, { error: tooLong });
 		const list = await loadSubjects(ctx.db, ctx.room.cls.id);
 		if (list.some((s) => s.code.toLowerCase() === code.toLowerCase())) return fail(400, { error: `มีรหัสวิชา ${code} อยู่แล้ว` });
 		const next = list.reduce((m, s) => Math.max(m, s.sortOrder), 0) + 1;
@@ -92,10 +94,12 @@ export const actions: Actions = {
 		if (denied) return denied;
 		const f = await event.request.formData();
 		const id = num(f.get('id'));
-		const code = clampText(f.get('code'), 20);
-		const name = clampText(f.get('name'), 100);
-		const teacher = clampText(f.get('teacher'), 60);
+		const code = readText(f.get('code'));
+		const name = readText(f.get('name'));
+		const teacher = readText(f.get('teacher'));
 		if (!code || !name) return fail(400, { error: 'กรุณากรอกรหัสวิชาและชื่อวิชา' });
+		const tooLong = lengthError([['รหัสวิชา', code, 20], ['ชื่อวิชา', name, 100], ['ผู้สอน', teacher, 60]]);
+		if (tooLong) return fail(400, { error: tooLong });
 		const list = await loadSubjects(ctx.db, ctx.room.cls.id);
 		if (!list.some((s) => s.id === id)) return fail(404, { error: 'ไม่พบวิชานี้' });
 		if (list.some((s) => s.id !== id && s.code.toLowerCase() === code.toLowerCase())) return fail(400, { error: `มีรหัสวิชา ${code} อยู่แล้ว` });
@@ -186,7 +190,7 @@ export const actions: Actions = {
 		const { ctx, denied } = await adminContext(event);
 		if (denied) return denied;
 		const f = await event.request.formData();
-		const input = { name: clampText(f.get('name'), 60), classLabel: clampText(f.get('label'), 40), startDate: String(f.get('start') ?? ''), endDate: String(f.get('end') ?? '') };
+		const input = { name: readText(f.get('name')), classLabel: readText(f.get('label')), startDate: String(f.get('start') ?? ''), endDate: String(f.get('end') ?? '') };
 		const err = validateTerm(input, ctx.room.terms);
 		if (err) return fail(400, { error: err });
 		const row = await ctx.db.insert(terms).values({ classId: ctx.room.cls.id, ...input }).returning({ id: terms.id }).get();
@@ -200,7 +204,7 @@ export const actions: Actions = {
 		if (denied) return denied;
 		const f = await event.request.formData();
 		const id = num(f.get('id'));
-		const input = { id, name: clampText(f.get('name'), 60), classLabel: clampText(f.get('label'), 40), startDate: String(f.get('start') ?? ''), endDate: String(f.get('end') ?? '') };
+		const input = { id, name: readText(f.get('name')), classLabel: readText(f.get('label')), startDate: String(f.get('start') ?? ''), endDate: String(f.get('end') ?? '') };
 		if (!ctx.room.terms.some((t) => t.id === id)) return fail(404, { error: 'ไม่พบภาคเรียน' });
 		const err = validateTerm(input, ctx.room.terms);
 		if (err) return fail(400, { error: err });

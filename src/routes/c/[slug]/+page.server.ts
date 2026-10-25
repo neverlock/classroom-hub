@@ -2,7 +2,7 @@ import { fail } from '@sveltejs/kit';
 import { and, eq, notInArray } from 'drizzle-orm';
 import { todayInBangkok, isIsoDate } from '#lib/dates.js';
 import { attachments, comments, entries, subjects } from '#lib/server/db/schema.js';
-import { clampText, MAX_COMMENT_IMAGES, MAX_ENTRY_IMAGES } from '#lib/validate.js';
+import { lengthError, MAX_COMMENT_IMAGES, MAX_ENTRY_IMAGES, readText } from '#lib/validate.js';
 import { loadMain, loadSubjects } from '#lib/server/queries.js';
 import { adminContext, forgetStudentAction, identifyStudent, identifyWriter, loginAction, logoutAction, rememberStudent, roomContext } from '#lib/server/room.js';
 import { pickFiles, saveImages } from '#lib/server/uploads.js';
@@ -68,13 +68,15 @@ export const actions: Actions = {
 
 		const date = String(form.get('date') ?? '');
 		const subjectId = Number(form.get('subjectId'));
-		const lesson = clampText(form.get('lesson'));
+		const lesson = readText(form.get('lesson'));
 		const hasHomework = form.get('hasHomework') === '1';
-		const detail = clampText(form.get('detail'));
+		const detail = readText(form.get('detail'));
 		const due = String(form.get('due') ?? '');
 		const keep = form.getAll('keep').map(Number).filter(Number.isInteger);
 		const files = pickFiles(form, 'photos');
 
+		const tooLong = lengthError([['สิ่งที่เรียน', lesson, 4000], ['โจทย์การบ้าน', detail, 4000]]);
+		if (tooLong) return fail(400, { error: tooLong });
 		const cur = room.current;
 		if (!cur) return fail(400, { error: 'ยังไม่ได้ตั้งภาคเรียนปัจจุบัน ให้แอดมินตั้งที่หน้าจัดการห้อง → ตั้งค่า' });
 		if (!isIsoDate(date) || !subjectId || !lesson) return fail(400, { error: 'กรุณากรอกวันที่ วิชา และสิ่งที่เรียน' });
@@ -188,7 +190,7 @@ export const actions: Actions = {
 		if (!room.cls.active) return fail(403, { error: 'ห้องนี้ปิดอยู่ (อ่านอย่างเดียว)', entryId: null });
 		const form = await event.request.formData();
 		const entryId = Number(form.get('entryId'));
-		const body = clampText(form.get('body'), 2000);
+		const body = readText(form.get('body'));
 		const files = pickFiles(form, 'photos');
 		const reply = (error: string) => fail(400, { error, entryId });
 
@@ -199,6 +201,8 @@ export const actions: Actions = {
 			.get();
 		if (!entry) return reply('ไม่พบการ์ดนี้');
 		if (!body && files.length === 0) return reply('กรุณาเขียนข้อความหรือแนบรูป');
+		const bodyErr = lengthError([['ความคิดเห็น', body, 2000]]);
+		if (bodyErr) return reply(bodyErr);
 		if (files.length > MAX_COMMENT_IMAGES) return reply(`แนบรูปได้ไม่เกิน ${MAX_COMMENT_IMAGES} รูป`);
 
 		const who = await identifyStudent(ctx, String(form.get('code') ?? ''));

@@ -132,6 +132,15 @@ export function parseStudentLines(text: string, existing: StudentLike[], skipId?
 	return out;
 }
 
-export function clampText(s: unknown, max = MAX_TEXT): string {
-	return typeof s === 'string' ? s.trim().slice(0, max) : '';
+/** Trimmed text from a form field. It is never cut short: too-long input is rejected with `lengthError`. */
+export function readText(s: unknown): string {
+	return typeof s === 'string' ? s.trim() : '';
+}
+
+/** Message for the first field longer than its limit, or null. Silent truncation would lose what people typed. */
+export function lengthError(rules: [label: string, value: string, max: number][]): string | null {
+	for (const [label, value, max] of rules) {
+		if (value.length > max) return `${label}ยาวเกินไป (ไม่เกิน ${max} ตัวอักษร ตอนนี้ ${value.length})`;
+	}
+	return null;
 }

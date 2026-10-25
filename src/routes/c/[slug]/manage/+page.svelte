@@ -110,9 +110,9 @@
 						<li class="lrow">
 							<form class="editgrid g3" method="POST" action={actionUrl(page.url, 'subjectSave')} use:enhance={withToast('แก้ไขวิชาแล้ว', { after: () => (editSub = null) })}>
 								<input type="hidden" name="id" value={s.id} />
-								<div><label for={`ec${s.id}`} style="margin-top: 0">รหัสวิชา</label><input type="text" id={`ec${s.id}`} name="code" value={s.code} autocomplete="off" /></div>
-								<div><label for={`en${s.id}`} style="margin-top: 0">ชื่อวิชา</label><input type="text" id={`en${s.id}`} name="name" value={s.name} autocomplete="off" /></div>
-								<div><label for={`et${s.id}`} style="margin-top: 0">ผู้สอน (ไม่ใส่ก็ได้)</label><input type="text" id={`et${s.id}`} name="teacher" value={s.teacher} autocomplete="off" /></div>
+								<div><label for={`ec${s.id}`} style="margin-top: 0">รหัสวิชา</label><input type="text" id={`ec${s.id}`} name="code" value={s.code} maxlength="20" autocomplete="off" /></div>
+								<div><label for={`en${s.id}`} style="margin-top: 0">ชื่อวิชา</label><input type="text" id={`en${s.id}`} name="name" value={s.name} maxlength="100" autocomplete="off" /></div>
+								<div><label for={`et${s.id}`} style="margin-top: 0">ผู้สอน (ไม่ใส่ก็ได้)</label><input type="text" id={`et${s.id}`} name="teacher" value={s.teacher} maxlength="60" autocomplete="off" /></div>
 								<div class="row2"><button class="btn" type="submit">บันทึก</button><button class="btn alt" type="button" onclick={() => (editSub = null)}>ยกเลิก</button></div>
 							</form>
 						</li>
@@ -145,11 +145,11 @@
 			<form class="box add" method="POST" action={actionUrl(page.url, 'subjectAdd')} use:enhance={withToast((d) => `เพิ่มวิชา ${d.added} แล้ว`)}>
 				<h2>+ เพิ่มวิชา</h2>
 				<label for="scode">รหัสวิชา</label>
-				<input type="text" id="scode" name="code" autocomplete="off" placeholder="เช่น ค21103" />
+				<input type="text" id="scode" name="code" maxlength="20" autocomplete="off" placeholder="เช่น ค21103" />
 				<label for="sname">ชื่อวิชา</label>
-				<input type="text" id="sname" name="name" autocomplete="off" placeholder="เช่น คณิตศาสตร์ 1" />
+				<input type="text" id="sname" name="name" maxlength="100" autocomplete="off" placeholder="เช่น คณิตศาสตร์ 1" />
 				<label for="steach">ผู้สอน (ไม่ใส่ก็ได้)</label>
-				<input type="text" id="steach" name="teacher" autocomplete="off" placeholder="เช่น ครูสมศรี" />
+				<input type="text" id="steach" name="teacher" maxlength="60" autocomplete="off" placeholder="เช่น ครูสมศรี" />
 				<p class="hint">ถ้าใส่ ชื่อผู้สอนจะแสดงเล็กๆ ที่การ์ดของวิชานี้ในหน้าหลัก (แก้ชื่อผู้สอนแล้ว การ์ดเก่าของวิชานี้จะแสดงชื่อใหม่ด้วย)</p>
 				<button class="btn" type="submit">เพิ่มวิชา</button>
 			</form>
