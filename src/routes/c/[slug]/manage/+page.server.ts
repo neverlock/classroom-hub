@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
-import { classAdmins, classes, comments, entries, students, subjects, terms } from '#lib/server/db/schema.js';
+import { attachments, classAdmins, classes, comments, entries, students, subjects, terms } from '#lib/server/db/schema.js';
 import { adminContext, forgetStudentAction, loginAction, logoutAction, roomContext } from '#lib/server/room.js';
 import { loadSubjects } from '#lib/server/queries.js';
 import { batch } from '#lib/server/env.js';
@@ -27,13 +27,31 @@ export const load: PageServerLoad = async (event) => {
 			.where(eq(classAdmins.classId, room.cls.id))
 			.orderBy(asc(classAdmins.id)),
 		db
-			.select({ id: entries.id, date: entries.entryDate, code: subjects.code, name: subjects.name, by: entries.hiddenBy, at: entries.hiddenAt })
+			.select({
+				id: entries.id,
+				date: entries.entryDate,
+				code: subjects.code,
+				name: subjects.name,
+				by: entries.hiddenBy,
+				at: entries.hiddenAt,
+				comments: sql<number>`(select count(*) from comments where comments.entry_id = ${entries.id})`,
+				photos: sql<number>`(select count(*) from attachments where attachments.entry_id = ${entries.id}) + (select count(*) from attachments join comments on attachments.comment_id = comments.id where comments.entry_id = ${entries.id})`
+			})
 			.from(entries)
 			.innerJoin(subjects, eq(entries.subjectId, subjects.id))
 			.where(and(eq(entries.classId, room.cls.id), eq(entries.hidden, true)))
 			.orderBy(desc(entries.hiddenAt)),
 		db
-			.select({ id: comments.id, seat: comments.seatNo, body: comments.body, date: entries.entryDate, code: subjects.code, by: comments.hiddenBy, at: comments.hiddenAt })
+			.select({
+				id: comments.id,
+				seat: comments.seatNo,
+				body: comments.body,
+				date: entries.entryDate,
+				code: subjects.code,
+				by: comments.hiddenBy,
+				at: comments.hiddenAt,
+				photos: sql<number>`(select count(*) from attachments where attachments.comment_id = ${comments.id})`
+			})
 			.from(comments)
 			.innerJoin(entries, eq(comments.entryId, entries.id))
 			.innerJoin(subjects, eq(entries.subjectId, subjects.id))
@@ -44,8 +62,8 @@ export const load: PageServerLoad = async (event) => {
 		{ id: number; n: number }[],
 		(typeof students.$inferSelect)[],
 		{ id: number; display: string; username: string; active: boolean; lastLoginAt: number | null }[],
-		{ id: number; date: string; code: string; name: string; by: string | null; at: number | null }[],
-		{ id: number; seat: number; body: string; date: string; code: string; by: string | null; at: number | null }[]
+		{ id: number; date: string; code: string; name: string; by: string | null; at: number | null; comments: number; photos: number }[],
+		{ id: number; seat: number; body: string; date: string; code: string; by: string | null; at: number | null; photos: number }[]
 	];
 	const countOf = new Map(counts.map((c) => [c.id, c.n]));
 	const hiddenComments = hiddenCommentRows;
@@ -243,5 +261,55 @@ export const actions: Actions = {
 		if (!mine) return fail(404, { error: 'ไม่พบความคิดเห็น' });
 		await ctx.db.update(comments).set({ hidden: false, hiddenBy: null, hiddenAt: null }).where(eq(comments.id, id));
 		return ok({ restored: true });
+	},
+
+	// ---------- permanent delete (only for items that are already hidden) ----------
+	purgeEntry: async (event) => {
+		const { ctx, denied } = await adminContext(event);
+		if (denied) return denied;
+		const id = num((await event.request.formData()).get('id'));
+		const { db, env, room } = ctx;
+		const entry = await db.select().from(entries).where(and(eq(entries.id, id), eq(entries.classId, room.cls.id))).get();
+		if (!entry) return fail(404, { error: 'ไม่พบการ์ด' });
+		if (!entry.hidden) return fail(400, { error: 'ลบถาวรได้เฉพาะการ์ดที่ซ่อนไว้แล้ว' });
+		// photos on the card and on every comment under it
+		const [own, theirs, nComments] = (await batch(db, [
+			db.select({ key: attachments.r2Key }).from(attachments).where(eq(attachments.entryId, id)),
+			db
+				.select({ key: attachments.r2Key })
+				.from(attachments)
+				.innerJoin(comments, eq(attachments.commentId, comments.id))
+				.where(eq(comments.entryId, id)),
+			db.select({ n: sql<number>`count(*)` }).from(comments).where(eq(comments.entryId, id))
+		])) as unknown as [{ key: string }[], { key: string }[], { n: number }[]];
+		const keys = [...own, ...theirs].map((r) => r.key);
+		// files first: if this fails nothing in the database has changed and the delete can simply be retried
+		for (let i = 0; i < keys.length; i += 500) await env.IMAGES.delete(keys.slice(i, i + 500));
+		await batch(db, [
+			db.delete(attachments).where(sql`${attachments.commentId} in (select id from comments where entry_id = ${id})`),
+			db.delete(attachments).where(eq(attachments.entryId, id)),
+			db.delete(comments).where(eq(comments.entryId, id)),
+			db.delete(entries).where(and(eq(entries.id, id), eq(entries.classId, room.cls.id)))
+		]);
+		return ok({ purged: 'entry' as const, comments: nComments[0]?.n ?? 0, photos: keys.length });
+	},
+
+	purgeComment: async (event) => {
+		const { ctx, denied } = await adminContext(event);
+		if (denied) return denied;
+		const id = num((await event.request.formData()).get('id'));
+		const { db, env, room } = ctx;
+		const c = await db
+			.select({ id: comments.id, hidden: comments.hidden })
+			.from(comments)
+			.innerJoin(entries, eq(comments.entryId, entries.id))
+			.where(and(eq(comments.id, id), eq(entries.classId, room.cls.id)))
+			.get();
+		if (!c) return fail(404, { error: 'ไม่พบความคิดเห็น' });
+		if (!c.hidden) return fail(400, { error: 'ลบถาวรได้เฉพาะความคิดเห็นที่ซ่อนไว้แล้ว' });
+		const files = await db.select({ key: attachments.r2Key }).from(attachments).where(eq(attachments.commentId, id)).all();
+		if (files.length) await env.IMAGES.delete(files.map((f) => f.key));
+		await batch(db, [db.delete(attachments).where(eq(attachments.commentId, id)), db.delete(comments).where(eq(comments.id, id))]);
+		return ok({ purged: 'comment' as const, photos: files.length });
 	}
 };

@@ -277,18 +277,33 @@
 
 			<div class="box">
 				<h2>ที่ซ่อนไว้ <span class="pill">{data.hiddenEntries.length + data.hiddenComments.length}</span></h2>
-				<p class="hint" style="margin-top: 2px">การ์ดหรือความคิดเห็นที่แอดมินซ่อน ยังไม่ถูกลบจริง กู้คืนได้</p>
+				<p class="hint" style="margin-top: 2px">การ์ดหรือความคิดเห็นที่ซ่อนไว้ ยังไม่ถูกลบจริง กู้คืนได้ · "ลบถาวร" จะลบการ์ดพร้อมความคิดเห็นและรูปทั้งหมดในการ์ดนั้นทิ้ง กู้คืนไม่ได้</p>
 				<ul class="list">
 					{#each data.hiddenEntries as h (h.id)}
 						<li class="lrow">
-							<div class="rmain"><span class="pill" style="margin-right: 6px">การ์ด</span>{h.code} · {fmtDate(h.date)}<small>ซ่อนโดย {h.by ?? '-'}{h.at ? ` · ${fmtDateTime(h.at, data.today)}` : ''}</small></div>
-							<form method="POST" action={actionUrl(page.url, 'restoreEntry')} use:enhance={withToast('กู้คืนแล้ว')}><input type="hidden" name="id" value={h.id} /><button class="sbtn" type="submit">กู้คืน</button></form>
+							<div class="rmain">
+								<span class="pill" style="margin-right: 6px">การ์ด</span>{h.code} · {fmtDate(h.date)}
+								<small>ซ่อนโดย {h.by ?? '-'}{h.at ? ` · ${fmtDateTime(h.at, data.today)}` : ''} · มี {h.comments} ความคิดเห็น · {h.photos} รูป</small>
+							</div>
+							<div class="tools" style="margin: 0">
+								<form method="POST" action={actionUrl(page.url, 'restoreEntry')} use:enhance={withToast('กู้คืนแล้ว')} style="display: contents"><input type="hidden" name="id" value={h.id} /><button class="sbtn" type="submit">กู้คืน</button></form>
+								<form method="POST" action={actionUrl(page.url, 'purgeEntry')} use:enhance={withToast((d) => `ลบการ์ดถาวรแล้ว (พร้อม ${d.comments} ความคิดเห็นและ ${d.photos} รูป)`)} style="display: contents">
+									<input type="hidden" name="id" value={h.id} />
+									<button class="sbtn" class:sure={sure === `pe${h.id}`} type="submit" onclick={(e) => arm(e, `pe${h.id}`)}>{sure === `pe${h.id}` ? 'ยืนยันลบถาวร?' : '🗑 ลบถาวร'}</button>
+								</form>
+							</div>
 						</li>
 					{/each}
 					{#each data.hiddenComments as h (h.id)}
 						<li class="lrow">
-							<div class="rmain"><span class="pill" style="margin-right: 6px">ความคิดเห็น</span>เลขที่ {h.seat} ใต้การ์ด {h.code} · {fmtDate(h.date)}<small>{h.body || '(รูป)'} · ซ่อนโดย {h.by ?? '-'}</small></div>
-							<form method="POST" action={actionUrl(page.url, 'restoreComment')} use:enhance={withToast('กู้คืนแล้ว')}><input type="hidden" name="id" value={h.id} /><button class="sbtn" type="submit">กู้คืน</button></form>
+							<div class="rmain"><span class="pill" style="margin-right: 6px">ความคิดเห็น</span>เลขที่ {h.seat} ใต้การ์ด {h.code} · {fmtDate(h.date)}<small>{h.body || '(รูป)'} · {h.photos} รูป · ซ่อนโดย {h.by ?? '-'}</small></div>
+							<div class="tools" style="margin: 0">
+								<form method="POST" action={actionUrl(page.url, 'restoreComment')} use:enhance={withToast('กู้คืนแล้ว')} style="display: contents"><input type="hidden" name="id" value={h.id} /><button class="sbtn" type="submit">กู้คืน</button></form>
+								<form method="POST" action={actionUrl(page.url, 'purgeComment')} use:enhance={withToast('ลบความคิดเห็นถาวรแล้ว')} style="display: contents">
+									<input type="hidden" name="id" value={h.id} />
+									<button class="sbtn" class:sure={sure === `pc${h.id}`} type="submit" onclick={(e) => arm(e, `pc${h.id}`)}>{sure === `pc${h.id}` ? 'ยืนยันลบถาวร?' : '🗑 ลบถาวร'}</button>
+								</form>
+							</div>
 						</li>
 					{/each}
 					{#if data.hiddenEntries.length + data.hiddenComments.length === 0}<li class="empty">ไม่มีรายการที่ซ่อนไว้</li>{/if}
