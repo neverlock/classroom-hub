@@ -7,6 +7,7 @@
 	import type { CardView } from '#lib/types.js';
 	import EntryCard from '#lib/components/EntryCard.svelte';
 	import EntryForm from '#lib/components/EntryForm.svelte';
+	import HomeworkItem from '#lib/components/HomeworkItem.svelte';
 	import Linkified from '#lib/components/Linkified.svelte';
 	import type { PageProps } from './$types';
 
@@ -159,10 +160,7 @@
 			<h2 class="sec">📌 การบ้านที่ต้องส่ง (เรียงตามกำหนด)</h2>
 			<div class="list">
 				{#each data.upcoming as r (r.id)}
-					<div class="item">
-						<div><b>{r.subjectCode} {r.subjectName}</b><p><Linkified text={r.detail} /></p><span class="byline">ส่ง {fmtDate(r.due)}</span></div>
-						<span class="chip due">{relDue(r.due, data.today)}</span>
-					</div>
+					<HomeworkItem row={r} {base} chip={{ text: relDue(r.due, data.today), late: false }} today={data.today} {isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} version={data} />
 				{:else}
 					<div class="empty">🎉 ยอดเยี่ยมมาก! ไม่มีการบ้านค้างเลยครับ</div>
 				{/each}
@@ -179,10 +177,7 @@
 						<div class="month"><span>{g.label}</span><span>{g.items.length} งาน</span></div>
 						<div class="list">
 							{#each g.items as r (r.id)}
-								<div class="item">
-									<div><b>{r.subjectCode} {r.subjectName}</b><p><Linkified text={r.detail} /></p><span class="byline">ส่ง {fmtDate(r.due)}</span></div>
-									<span class="chip late">{relDue(r.due, data.today)}</span>
-								</div>
+								<HomeworkItem row={r} {base} chip={{ text: relDue(r.due, data.today), late: true }} today={data.today} {isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} version={data} />
 							{/each}
 						</div>
 					{/each}

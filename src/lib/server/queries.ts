@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, gte, lt, max, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, lt, max, sql, type SQL } from 'drizzle-orm';
 import { addDays, isIsoDate } from '#lib/dates.js';
 import { attachments, classAdmins, classes, comments, entries, students, subjects, terms } from './db/schema';
 import type { CardView, HomeworkRow } from '#lib/types.js';
@@ -42,6 +42,92 @@ export interface Viewer {
 	studentId: number | null;
 }
 
+type CardRow = { id: number; lesson: string; hasHomework: boolean; homeworkDetail: string | null; homeworkDue: string | null; author: string; authorStudentId: number | null; sid: number; code: string; name: string; teacher: string | null };
+
+/** The cards matching `where`, in the order they are shown. */
+function cardRows(db: Db, where: SQL | undefined) {
+	return db
+		.select({
+			id: entries.id,
+			lesson: entries.lesson,
+			hasHomework: entries.hasHomework,
+			homeworkDetail: entries.homeworkDetail,
+			homeworkDue: entries.homeworkDue,
+			author: entries.authorDisplay,
+			authorStudentId: entries.authorStudentId,
+			// D1 batch rows are keyed by column name: entries.id and subjects.id would collapse into one `id`
+			// and shift every later column, so the second one needs its own name
+			sid: sql<number>`${subjects.id}`.as('subject_id'),
+			code: subjects.code,
+			name: subjects.name,
+			teacher: subjects.teacher
+		})
+		.from(entries)
+		.innerJoin(subjects, eq(entries.subjectId, subjects.id))
+		.where(where)
+		.orderBy(asc(subjects.sortOrder), asc(entries.id));
+}
+
+/** Photos of the entries matching `where` (an `entries` condition), by attachment id. */
+function entryPhotos(db: Db, where: SQL | undefined) {
+	return db.select({ id: attachments.id, entryId: attachments.entryId }).from(attachments).innerJoin(entries, eq(attachments.entryId, entries.id)).where(where).orderBy(asc(attachments.id));
+}
+
+function entryComments(db: Db, where: SQL | undefined) {
+	return db
+		.select({ id: comments.id, entryId: comments.entryId, seatNo: comments.seatNo, body: comments.body, createdAt: comments.createdAt })
+		.from(comments)
+		.innerJoin(entries, eq(comments.entryId, entries.id))
+		.where(and(where, eq(comments.hidden, false)))
+		.orderBy(asc(comments.createdAt), asc(comments.id));
+}
+
+function commentPhotos(db: Db, where: SQL | undefined) {
+	return db
+		.select({ id: attachments.id, commentId: attachments.commentId })
+		.from(attachments)
+		.innerJoin(comments, eq(attachments.commentId, comments.id))
+		.innerJoin(entries, eq(comments.entryId, entries.id))
+		.where(and(where, eq(comments.hidden, false)))
+		.orderBy(asc(attachments.id));
+}
+
+type PhotoRows = { id: number; entryId: number }[];
+type CommentRows = { id: number; entryId: number; seatNo: number; body: string; createdAt: number }[];
+type CommentPhotoRows = { id: number; commentId: number }[];
+
+function buildCards(
+	rows: CardRow[],
+	pics: PhotoRows,
+	cs: CommentRows,
+	cPics: CommentPhotoRows,
+	opts: { date: string | ((r: CardRow) => string); canEdit: (r: CardRow) => boolean }
+): CardView[] {
+	const photosByEntry = new Map<number, number[]>();
+	for (const p of pics) photosByEntry.set(p.entryId, [...(photosByEntry.get(p.entryId) ?? []), p.id]);
+	const photosByComment = new Map<number, number[]>();
+	for (const p of cPics) photosByComment.set(p.commentId, [...(photosByComment.get(p.commentId) ?? []), p.id]);
+	const commentsByEntry = new Map<number, CardView['comments']>();
+	for (const c of cs) {
+		const list = commentsByEntry.get(c.entryId) ?? [];
+		list.push({ id: c.id, seatNo: c.seatNo, body: c.body, createdAt: c.createdAt, photos: photosByComment.get(c.id) ?? [] });
+		commentsByEntry.set(c.entryId, list);
+	}
+	return rows.map((r) => ({
+		id: r.id,
+		date: typeof opts.date === 'string' ? opts.date : opts.date(r),
+		subject: { id: r.sid, code: r.code, name: r.name, teacher: r.teacher },
+		lesson: r.lesson,
+		hasHomework: r.hasHomework,
+		homeworkDetail: r.homeworkDetail ?? '',
+		homeworkDue: r.homeworkDue,
+		author: r.author,
+		canEdit: opts.canEdit(r),
+		photos: photosByEntry.get(r.id) ?? [],
+		comments: commentsByEntry.get(r.id) ?? []
+	}));
+}
+
 export async function loadMain(
 	db: Db,
 	room: Room,
@@ -71,26 +157,7 @@ export async function loadMain(
 	// (class, date) through joins, so they do not have to wait for the list of cards.
 	const dayOf = and(eq(entries.classId, cls.id), eq(entries.entryDate, date), eq(entries.hidden, false));
 	const [rows, hwRows, pics, cs, cPics, subs] = (await batch(db, [
-		db
-			.select({
-				id: entries.id,
-				lesson: entries.lesson,
-				hasHomework: entries.hasHomework,
-				homeworkDetail: entries.homeworkDetail,
-				homeworkDue: entries.homeworkDue,
-				author: entries.authorDisplay,
-				authorStudentId: entries.authorStudentId,
-				// D1 batch rows are keyed by column name: entries.id and subjects.id would collapse into one `id`
-				// and shift every later column, so the second one needs its own name
-				sid: sql<number>`${subjects.id}`.as('subject_id'),
-				code: subjects.code,
-				name: subjects.name,
-				teacher: subjects.teacher
-			})
-			.from(entries)
-			.innerJoin(subjects, eq(entries.subjectId, subjects.id))
-			.where(dayOf)
-			.orderBy(asc(subjects.sortOrder), asc(entries.id)),
+		cardRows(db, dayOf),
 		db
 			.select({ id: entries.id, code: subjects.code, name: subjects.name, detail: entries.homeworkDetail, due: entries.homeworkDue })
 			.from(entries)
@@ -105,65 +172,48 @@ export async function loadMain(
 				)
 			)
 			.orderBy(asc(entries.homeworkDue), asc(entries.id)),
-		db
-			.select({ id: attachments.id, entryId: attachments.entryId })
-			.from(attachments)
-			.innerJoin(entries, eq(attachments.entryId, entries.id))
-			.where(dayOf)
-			.orderBy(asc(attachments.id)),
-		db
-			.select({ id: comments.id, entryId: comments.entryId, seatNo: comments.seatNo, body: comments.body, createdAt: comments.createdAt })
-			.from(comments)
-			.innerJoin(entries, eq(comments.entryId, entries.id))
-			.where(and(dayOf, eq(comments.hidden, false)))
-			.orderBy(asc(comments.createdAt), asc(comments.id)),
-		db
-			.select({ id: attachments.id, commentId: attachments.commentId })
-			.from(attachments)
-			.innerJoin(comments, eq(attachments.commentId, comments.id))
-			.innerJoin(entries, eq(comments.entryId, entries.id))
-			.where(and(dayOf, eq(comments.hidden, false)))
-			.orderBy(asc(attachments.id)),
+		entryPhotos(db, dayOf),
+		entryComments(db, dayOf),
+		commentPhotos(db, dayOf),
 		db.select().from(subjects).where(eq(subjects.classId, cls.id)).orderBy(asc(subjects.sortOrder), asc(subjects.id))
 	])) as [
-		{ id: number; lesson: string; hasHomework: boolean; homeworkDetail: string | null; homeworkDue: string | null; author: string; authorStudentId: number | null; sid: number; code: string; name: string; teacher: string | null }[],
+		CardRow[],
 		{ id: number; code: string; name: string; detail: string | null; due: string | null }[],
-		{ id: number; entryId: number }[],
-		{ id: number; entryId: number; seatNo: number; body: string; createdAt: number }[],
-		{ id: number; commentId: number }[],
+		PhotoRows,
+		CommentRows,
+		CommentPhotoRows,
 		(typeof subjects.$inferSelect)[]
 	];
 
-	const photosByEntry = new Map<number, number[]>();
-	for (const p of pics) photosByEntry.set(p.entryId, [...(photosByEntry.get(p.entryId) ?? []), p.id]);
-	const photosByComment = new Map<number, number[]>();
-	for (const p of cPics) photosByComment.set(p.commentId, [...(photosByComment.get(p.commentId) ?? []), p.id]);
-	const commentsByEntry = new Map<number, CardView['comments']>();
-	for (const c of cs) {
-		const list = commentsByEntry.get(c.entryId) ?? [];
-		list.push({ id: c.id, seatNo: c.seatNo, body: c.body, createdAt: c.createdAt, photos: photosByComment.get(c.id) ?? [] });
-		commentsByEntry.set(c.entryId, list);
-	}
-
-	const cards: CardView[] = rows.map((r) => ({
-		id: r.id,
+	const cards = buildCards(rows, pics, cs, cPics, {
 		date,
-		subject: { id: r.sid, code: r.code, name: r.name, teacher: r.teacher },
-		lesson: r.lesson,
-		hasHomework: r.hasHomework,
-		homeworkDetail: r.homeworkDetail ?? '',
-		homeworkDue: r.homeworkDue,
-		author: r.author,
-		canEdit: isCurrent && room.cls.active && (viewer.admin || (viewer.studentId !== null && r.authorStudentId === viewer.studentId)),
-		photos: photosByEntry.get(r.id) ?? [],
-		comments: commentsByEntry.get(r.id) ?? []
-	}));
+		canEdit: (r) => isCurrent && room.cls.active && (viewer.admin || (viewer.studentId !== null && r.authorStudentId === viewer.studentId))
+	});
 
 	const toRow = (r: (typeof hwRows)[number]): HomeworkRow => ({ id: r.id, subjectCode: r.code, subjectName: r.name, detail: r.detail ?? '', due: r.due ?? '' });
 	const upcoming = isCurrent ? hwRows.filter((r) => (r.due ?? '') >= today).map(toRow) : [];
 	const overdue = hwRows.filter((r) => (r.due ?? '') < today).map(toRow).reverse();
 
 	return { view, date, cards, upcoming, overdue, subjects: subs };
+}
+
+/**
+ * One homework/lesson card with its photos and comments, for expanding a row of the homework lists.
+ * Same shape and edit rules as the cards on the home page; null when the card does not exist or is hidden.
+ */
+export async function loadCard(db: Db, room: Room, entryId: number, viewer: Viewer): Promise<CardView | null> {
+	const one = and(eq(entries.id, entryId), eq(entries.classId, room.cls.id), eq(entries.hidden, false));
+	const [rows, pics, cs, cPics, days] = (await batch(db, [cardRows(db, one), entryPhotos(db, one), entryComments(db, one), commentPhotos(db, one), db.select({ d: entries.entryDate }).from(entries).where(one)])) as [CardRow[], PhotoRows, CommentRows, CommentPhotoRows, { d: string }[]];
+	if (rows.length === 0) return null;
+	const date = days[0].d;
+	const term = room.terms.find((t) => date >= t.startDate && date <= t.endDate);
+	const isCurrent = !!term && term.id === room.current?.id;
+	return (
+		buildCards(rows, pics, cs, cPics, {
+			date,
+			canEdit: (r) => isCurrent && room.cls.active && (viewer.admin || (viewer.studentId !== null && r.authorStudentId === viewer.studentId))
+		})[0] ?? null
+	);
 }
 
 export async function loadSubjects(db: Db, classId: number) {

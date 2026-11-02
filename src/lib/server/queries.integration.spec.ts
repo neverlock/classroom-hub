@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getDb } from './db';
 import { attachments, classAdmins, classes, comments, entries, students, subjects, terms } from './db/schema';
-import { loadAdminOverview, loadMain, loadManageData, loadRoomBundle } from './queries';
+import { loadAdminOverview, loadCard, loadMain, loadManageData, loadRoomBundle } from './queries';
 
 /**
  * Runs the real queries against a real (in-memory) D1 from wrangler's local runtime.
@@ -88,6 +88,16 @@ describe('loadMain / loadRoomBundle against D1', () => {
 		});
 		expect(main.upcoming.map((r) => [r.id, r.subjectCode, r.subjectName, r.due])).toEqual([[e2.id, 'ท21101', 'ภาษาไทย', '2026-11-04']]);
 		expect(main.subjects.map((s) => s.code)).toEqual(['อ21103', 'ท21101', 'ค21103']);
+
+		// the same card, loaded on its own when a homework row is expanded
+		const one = await loadCard(db, bundle!.room, e1.id, { admin: false, studentId: stu.id });
+		expect(one).toEqual({ ...main.cards[0], date: day });
+		const other = await loadCard(db, bundle!.room, e2.id, { admin: false, studentId: stu.id });
+		expect(other).toMatchObject({ id: e2.id, date: day, canEdit: false, subject: { id: thai.id, code: 'ท21101' } });
+		expect((await loadCard(db, bundle!.room, e2.id, { admin: true, studentId: null }))?.canEdit).toBe(true);
+		await db.update(entries).set({ hidden: true }).where(eq(entries.id, e2.id));
+		expect(await loadCard(db, bundle!.room, e2.id, { admin: true, studentId: null })).toBeNull();
+		expect(await loadCard(db, bundle!.room, 99999, { admin: true, studentId: null })).toBeNull();
 	}, 60_000);
 });
 
