@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, getTableColumns, gte, lt, max, sql, type SQL } from 'drizzle-orm';
 import { addDays, isIsoDate } from '#lib/dates.js';
-import { attachments, classAdmins, classes, comments, entries, students, subjects, terms } from './db/schema';
+import { attachments, classAdmins, classes, comments, entries, gpaCourses, gpaSubjects, students, subjects, terms } from './db/schema';
 import type { CardView, HomeworkRow } from '#lib/types.js';
 import { batch, type Db } from './env';
 
@@ -311,4 +311,34 @@ export async function loadAdminOverview(db: Db) {
 		{ n: number }[]
 	];
 	return { rooms, entryRows, studentRows, admins, postRows, byteRows };
+}
+
+export type GpaCourseRow = typeof gpaCourses.$inferSelect;
+export type GpaSubjectRow = typeof gpaSubjects.$inferSelect;
+
+/** Super admin list: every course with its subject count and total credits (×2), in one round trip. */
+export async function loadGpaCourses(db: Db) {
+	const [courses, sums] = (await batch(db, [
+		db.select().from(gpaCourses).orderBy(desc(gpaCourses.createdAt), desc(gpaCourses.id)),
+		db
+			.select({ courseId: gpaSubjects.courseId, n: sql<number>`count(*)`.as('n'), credit2: sql<number>`coalesce(sum(${gpaSubjects.credit2}), 0)`.as('credit2') })
+			.from(gpaSubjects)
+			.groupBy(gpaSubjects.courseId)
+	])) as [GpaCourseRow[], { courseId: number; n: number; credit2: number }[]];
+	const by = new Map(sums.map((r) => [r.courseId, r]));
+	return courses.map((c) => ({ ...c, subjects: by.get(c.id)?.n ?? 0, credit2: by.get(c.id)?.credit2 ?? 0 }));
+}
+
+/** One course and all its subjects (ordered), or null. Used by both the public calculator and the manage page. */
+export async function loadGpaCourse(db: Db, slug: string) {
+	const [courses, subs] = (await batch(db, [
+		db.select().from(gpaCourses).where(eq(gpaCourses.slug, slug)),
+		db
+			.select(getTableColumns(gpaSubjects))
+			.from(gpaSubjects)
+			.innerJoin(gpaCourses, eq(gpaSubjects.courseId, gpaCourses.id))
+			.where(eq(gpaCourses.slug, slug))
+			.orderBy(asc(gpaSubjects.termNo), asc(gpaSubjects.sortOrder), asc(gpaSubjects.id))
+	])) as [GpaCourseRow[], GpaSubjectRow[]];
+	return courses[0] ? { course: courses[0], subjects: subs } : null;
 }

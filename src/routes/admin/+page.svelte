@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { enhance } from '$app/forms';
 	import { fileSize } from '#lib/dates.js';
+	import { fmtCredit } from '#lib/gpa.js';
 	import { randomPassword } from '#lib/password.js';
 	import { toast } from '#lib/toast.svelte.js';
 	import type { SubmitFunction } from '$app/forms';
@@ -24,8 +26,22 @@
 	let addPw = $state(randomPassword());
 	let formError = $state<{ roomId?: number; adminId?: number; text: string } | null>(null);
 	let createError = $state('');
+	type Menu = 'rooms' | 'gpa' | 'sys';
+	const asMenu = (v: string | null): Menu => (v === 'gpa' || v === 'sys' ? v : 'rooms');
+	let menu = $state<Menu>(asMenu(page.url.searchParams.get('m')));
+	let cslug = $state('');
+	const origin = $derived(page.url.origin);
+	let courseError = $state('');
+	function pick(m: Menu) {
+		menu = m;
+		const q = new URL(page.url.href);
+		if (m === 'rooms') q.searchParams.delete('m');
+		else q.searchParams.set('m', m);
+		history.replaceState(history.state, '', q);
+	}
 
 	const on = $derived(data.rooms.filter((r) => r.active).length);
+	const courseOn = $derived(data.courses.filter((c) => c.active).length);
 	const pct = $derived(Math.min(100, Math.max(1, Math.round((data.usedBytes / data.freeBytes) * 100))));
 
 	function arm(ev: Event, key: string) {
@@ -71,13 +87,19 @@
 	<p class="sub">สำหรับผู้ดูแลระบบ (super admin) เท่านั้น</p>
 	<div class="warn" style="justify-content: center">🔐 เข้าสู่ระบบด้วย Cloudflare Access: <b style="overflow-wrap: anywhere">{data.email}</b></div>
 
+	<div class="a-menu" role="tablist" aria-label="เมนูจัดการ">
+		<button type="button" role="tab" aria-selected={menu === 'rooms'} onclick={() => pick('rooms')}><b>🏫 ห้องเรียน</b><span>{data.rooms.length} ห้อง</span></button>
+		<button type="button" role="tab" aria-selected={menu === 'gpa'} onclick={() => pick('gpa')}><b>🎓 GPA</b><span>{data.courses.length} หลักสูตร</span></button>
+		<button type="button" role="tab" aria-selected={menu === 'sys'} onclick={() => pick('sys')}><b>⚙ ระบบ</b><span>พื้นที่ · สำรอง</span></button>
+	</div>
+
+	{#if menu === 'rooms'}
+
 	<div class="nums">
 		<div class="num"><b>{data.rooms.length}</b><span>ห้องทั้งหมด</span></div>
 		<div class="num"><b>{on}</b><span>เปิดใช้งาน</span></div>
 		<div class="num"><b>{fileSize(data.usedBytes)}</b><span>พื้นที่รูป</span></div>
 	</div>
-	<div class="bar" role="img" aria-label={`พื้นที่เก็บรูปที่ใช้ไปแล้ว ${pct} เปอร์เซ็นต์`}><i style={`width: ${pct}%`}></i></div>
-	<p class="hint">ใช้ไป {fileSize(data.usedBytes)} จาก 10 GB ของพื้นที่ฟรี (ประมาณการ ตรวจโควตาจริงที่ Cloudflare)</p>
 
 	<h2 class="sec">ห้องเรียน</h2>
 	<ul class="list">
@@ -214,7 +236,78 @@
 		<button class="btn" type="submit">สร้างห้อง</button>
 	</form>
 
-	<h2 class="sec">ระบบ</h2>
+	{/if}
+
+	{#if menu === 'gpa'}
+		<div class="nums">
+			<div class="num"><b>{data.courses.length}</b><span>หลักสูตร</span></div>
+			<div class="num"><b>{courseOn}</b><span>เปิดใช้งาน</span></div>
+			<div class="num"><b>6</b><span>เทอม/หลักสูตร</span></div>
+		</div>
+		<h2 class="sec">หลักสูตร GPA</h2>
+		<p class="hint">ลิงก์สาธารณะ ไม่ต้องล็อกอิน เกรดที่ผู้ใช้กรอกคำนวณในเครื่องของเขา ไม่ถูกส่งหรือเก็บบนเซิร์ฟเวอร์</p>
+		<ul class="list">
+			{#each data.courses as c (c.id)}
+				<li class="room" class:off={!c.active}>
+					<div class="top"><h3>{c.name}</h3><span class="pill" class:on={c.active}>{c.active ? 'เปิดใช้งาน' : 'ปิดอยู่'}</span></div>
+					<div class="url">/u/{c.slug}</div>
+					<div class="rmeta"><span>6 เทอม</span><span>วิชา <b>{c.subjects}</b></span><span>หน่วยกิตรวม <b>{fmtCredit(c.credit2)}</b></span></div>
+					<div class="tools">
+						<a class="sbtn" href={`/admin/gpa/${c.slug}`}>จัดการ →</a>
+						<button class="sbtn" type="button" onclick={() => copy(`${location.origin}/u/${c.slug}`, `คัดลอกลิงก์ /u/${c.slug} แล้ว`)}>คัดลอกลิงก์</button>
+						<a class="sbtn" href={`/u/${c.slug}`} target="_blank" rel="noopener">ดูหน้าผู้ใช้ ↗</a>
+						<form method="POST" action="?/toggleCourse" use:enhance={handle((d) => (d.active ? `เปิดหลักสูตร ${d.toggledCourse} แล้ว` : `ปิดหลักสูตร ${d.toggledCourse} แล้ว ผู้ใช้จะเห็นข้อความว่าปิดอยู่`))} style="display: contents">
+							<input type="hidden" name="id" value={c.id} /><button class="sbtn" type="submit">{c.active ? 'ปิดหลักสูตร' : 'เปิดหลักสูตรอีกครั้ง'}</button>
+						</form>
+						<form method="POST" action="?/deleteCourse" use:enhance={handle(() => 'ลบหลักสูตรแล้ว')} style="display: contents">
+							<input type="hidden" name="id" value={c.id} />
+							<button class="sbtn" class:sure={sure === `c${c.id}`} type="submit" aria-label="ลบหลักสูตร" title="ลบ" onclick={(e) => arm(e, `c${c.id}`)}>{sure === `c${c.id}` ? 'ยืนยันลบ?' : '🗑'}</button>
+						</form>
+					</div>
+				</li>
+			{:else}
+				<li class="empty">ยังไม่มีหลักสูตร สร้างลิงก์แรกด้านล่าง</li>
+			{/each}
+		</ul>
+
+		<form
+			class="box add"
+			style="margin-top: 20px"
+			method="POST"
+			action="?/createCourse"
+			use:enhance={() =>
+				async ({ result, update }) => {
+					courseError = '';
+					if (result.type === 'failure') {
+						courseError = String((result.data as { error?: string } | undefined)?.error ?? 'เกิดข้อผิดพลาด');
+						return;
+					}
+					if (result.type === 'success') {
+						const c = (result.data as { createdCourse: { slug: string } }).createdCourse;
+						toast(`สร้างลิงก์ /u/${c.slug} แล้ว · กด "จัดการ" เพื่อเพิ่มวิชา`);
+						cslug = '';
+					}
+					await update({ reset: true });
+				}}
+		>
+			<h2>+ สร้างลิงก์หลักสูตรใหม่</h2>
+			<label for="cslug" style="margin-top: 8px">ชื่อลิงก์ (ตั้งแล้วเปลี่ยนไม่ได้)</label>
+			<div class="g-linkfield"><span>/u/</span><input type="text" id="cslug" name="slug" bind:value={cslug} autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="เช่น iep" /></div>
+			<p class="urlprev">{origin}/u/{cslug.trim().toLowerCase() || '…'}</p>
+			<p class="hint">ตัวอักษรอังกฤษพิมพ์เล็ก ตัวเลข และขีด 3–30 ตัว</p>
+			<label for="cname">ชื่อหลักสูตรที่แสดง</label>
+			<input type="text" id="cname" name="name" maxlength="60" autocomplete="off" placeholder="เช่น หลักสูตร IEP" />
+			{#if courseError}<p class="err" role="alert">{courseError}</p>{/if}
+			<button class="btn" type="submit">สร้างลิงก์</button>
+			<p class="hint">สร้างแล้วจะมีเทอมว่างให้ 6 เทอม (ม.1 เทอม 1 → ม.3 เทอม 2) แล้วกด "จัดการ" เพื่อเพิ่มวิชา</p>
+		</form>
+	{/if}
+
+	{#if menu === 'sys'}
+		<h2 class="sec">พื้นที่ใช้งาน</h2>
+		<div class="bar" role="img" aria-label={`พื้นที่เก็บรูปที่ใช้ไปแล้ว ${pct} เปอร์เซ็นต์`}><i style={`width: ${pct}%`}></i></div>
+		<p class="hint">รูปใช้ไป {fileSize(data.usedBytes)} จาก 10 GB ของพื้นที่ฟรี (ประมาณการ ตรวจโควตาจริงที่ Cloudflare)</p>
+		<h2 class="sec">ระบบ</h2>
 	<div class="box" style="margin-top: 8px">
 		<b>ผู้ดูแลระบบ (Super admin)</b>
 		<p class="hint">เข้าสู่ระบบด้วยอีเมลที่อนุญาตในนโยบาย Cloudflare Access การเพิ่มหรือลบทำที่ Cloudflare Zero Trust (Access → Applications) ไม่แก้ในหน้านี้ เพื่อกันล็อกตัวเองออกจากระบบ</p>
@@ -223,4 +316,5 @@
 		<b>สำรองข้อมูล</b>
 		<p class="hint">ส่งออกฐานข้อมูลด้วย <code>npx wrangler d1 export classroom-hub --remote --output backup.sql</code> แนะนำให้สำรองก่อนสิ้นภาคเรียนทุกครั้ง</p>
 	</div>
+	{/if}
 </div>

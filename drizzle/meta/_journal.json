@@ -15,6 +15,13 @@
       "when": 1792918886819,
       "tag": "0001_panoramic_george_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794063323772,
+      "tag": "0002_mysterious_lethal_legion",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,487 @@
+<title>ระบบคำนวณ GPA ม.ต้น</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600&family=Sarabun:wght@400;500;700&display=swap">
+<style>
+/* Layout: one phone-width column (mobile first). A thin mock toolbar switches between the three pages being proposed:
+   Super admin (3 menus), course manage page, and the public GPA calculator. Same brown / yellow / cream identity as the rooms. */
+:root{
+  --bg:#f5efe3; --surface:#ffffff; --ink:#43291a; --muted:#85705c; --line:#e6dccb;
+  --accent:#ffcc0a; --accent-ink:#43291a; --hw-bg:#fff7d6; --hw-line:#f1c40f;
+  --good:#2f8a3e; --good-bg:#e4f3e6; --danger:#b83a2a; --panel:#efe7da; --focus:#1b6fd8;
+  --tool-bg:#2c1a0f; --tool-ink:#f4e9d7; --total-bg:#ffe27a; --total-line:#d9a900; --total-rule:#c99a00;
+  --font-display:'Prompt','Sarabun',system-ui,sans-serif;
+  --font-body:'Sarabun','Noto Sans Thai',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1b140e; --surface:#2a2017; --ink:#f4e9d7; --muted:#b9a68e; --line:#43362a;
+  --accent:#ffcc0a; --accent-ink:#2a1a0c; --hw-bg:#3a3010; --hw-line:#c9a008;
+  --good:#6fcb7e; --good-bg:#1f3524; --danger:#ff8d7a; --panel:#33281d; --focus:#7db4ff;
+  --tool-bg:#0f0a06; --tool-ink:#f4e9d7; --total-bg:#4d3d08; --total-line:#e0b400; --total-rule:#8a6d10; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1b140e; --surface:#2a2017; --ink:#f4e9d7; --muted:#b9a68e; --line:#43362a;
+  --accent:#ffcc0a; --accent-ink:#2a1a0c; --hw-bg:#3a3010; --hw-line:#c9a008;
+  --good:#6fcb7e; --good-bg:#1f3524; --danger:#ff8d7a; --panel:#33281d; --focus:#7db4ff;
+  --tool-bg:#0f0a06; --tool-ink:#f4e9d7; --total-bg:#4d3d08; --total-line:#e0b400; --total-rule:#8a6d10; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.55;
+  padding-block:0 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+h1,h2,h3{margin:0}
+h1{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,6vw,28px);text-align:center;text-wrap:balance;margin-top:6px}
+h2{font-family:var(--font-display);font-weight:600;font-size:19px}
+h3{font-family:var(--font-display);font-weight:600;font-size:17px;overflow-wrap:anywhere}
+.tabular{font-variant-numeric:tabular-nums}
+
+/* mock toolbar (not part of the design) */
+.mockbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;margin:0 calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:8px max(16px,env(safe-area-inset-left,0px));background:var(--tool-bg);color:var(--tool-ink);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.mockbar small{opacity:.7;font-size:12px;flex:1 0 100%}
+.mockbar button{flex:1 1 0;min-height:40px;border-radius:10px;border:1px solid #6b5846;background:transparent;color:var(--tool-ink);font-weight:700;font-size:14px;cursor:pointer;padding:0 6px}
+.mockbar button[aria-pressed=true]{background:var(--accent);color:#2a1a0c;border-color:var(--accent)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--tool-bg);z-index:30}
+
+.wrap{max-width:460px;margin:16px auto 0;background:var(--surface);border-radius:20px;border-top:12px solid var(--ink);padding:20px 16px 28px;box-shadow:0 8px 30px rgba(67,41,26,.10)}
+.sub{text-align:center;color:var(--muted);font-size:14px;margin:2px 0 12px}
+.rule{height:3px;background:var(--accent);border:0;margin:12px 0 14px}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+label{display:block;font-weight:700;margin:14px 0 5px}
+input[type=text]{width:100%;min-height:46px;font-size:16px;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+.btn{border:0;border-radius:10px;padding:12px 16px;background:var(--ink);color:var(--accent);font-weight:700;cursor:pointer;width:100%;margin-top:14px;font-size:17px;min-height:48px}
+.btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--ink);width:auto;margin:0}
+.sbtn{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 14px;cursor:pointer;font-size:15px;font-weight:700;flex:1 1 auto;text-decoration:none;display:inline-grid;place-items:center;color:inherit}
+.sbtn.sure{background:var(--danger);color:#fff;border-color:var(--danger)}
+.ibtn{background:var(--surface);border:1px solid var(--line);border-radius:10px;width:44px;height:44px;cursor:pointer;font-size:16px;line-height:1}
+.ibtn:disabled{opacity:.35;cursor:not-allowed}
+.ibtn.sure{width:auto;padding:0 10px;background:var(--danger);color:#fff;border-color:var(--danger);font-size:14px;font-weight:700}
+.pill{display:inline-block;font-size:12px;border-radius:99px;padding:0 10px;background:var(--panel);color:var(--muted);font-weight:700}
+.pill.on{background:var(--good);color:#fff}
+.note{margin-top:18px;border:1px dashed var(--muted);border-radius:12px;padding:10px 12px;font-size:14px}
+.note summary{cursor:pointer;font-weight:700;color:var(--muted)}
+.note ul{margin:8px 0 0;padding-left:20px}
+.note li{margin-bottom:4px}
+.mocktag{display:block;width:fit-content;margin:0 auto 6px;font-size:12px;padding:2px 12px;border-radius:99px;border:1px dashed var(--muted);color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--accent);padding:10px 18px;border-radius:99px;font-weight:700;font-size:15px;z-index:40;max-width:90vw}
+
+/* ---- super admin menu ---- */
+.who{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;font-size:14px;color:var(--muted);background:var(--panel);border-radius:12px;padding:8px 12px}
+.who b{color:var(--ink);overflow-wrap:anywhere}
+.menu{position:sticky;top:calc(env(safe-area-inset-top,0px) + 96px);z-index:10;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--panel);border-radius:14px;padding:4px;margin:14px 0 0}
+.menu button{border:0;background:transparent;border-radius:11px;min-height:56px;padding:4px 2px;cursor:pointer;font-weight:700;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.2;color:var(--muted)}
+.menu button b{font-family:var(--font-display);font-size:15px;font-weight:600}
+.menu button span{font-size:11px;font-weight:500}
+.menu button[aria-selected=true]{background:var(--ink);color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0 0}
+.stat{background:var(--panel);border-radius:12px;padding:10px 6px;text-align:center}
+.stat b{display:block;font-family:var(--font-display);font-size:clamp(17px,5vw,22px);line-height:1.2;white-space:nowrap}
+.stat span{font-size:12px;color:var(--muted)}
+.bar{height:10px;border-radius:99px;background:var(--panel);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--accent);border-right:2px solid var(--ink)}
+.sechead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:24px}
+.list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:12px}
+.room{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--ink);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.room.off{opacity:.72;border-left-color:var(--muted)}
+.room.fresh{border-color:var(--hw-line);background:var(--hw-bg)}
+.top{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.url{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.meta{font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px}
+.meta b{color:var(--ink)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.card.add{background:var(--hw-bg);border:1.5px dashed var(--hw-line);border-radius:12px;padding:14px;margin-top:14px}
+.linkfield{display:flex;align-items:stretch}
+.linkfield .pre{display:grid;place-items:center;padding:0 10px;background:var(--panel);border:1.5px solid var(--line);border-right:0;border-radius:10px 0 0 10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;white-space:nowrap}
+.linkfield input{border-radius:0 10px 10px 0;min-width:0}
+.preview{margin-top:8px;font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.preview b{color:var(--ink);font-family:ui-monospace,Menlo,Consolas,monospace}
+.sysbox{background:var(--panel);border-radius:12px;padding:12px 14px;margin-top:12px;font-size:14px}
+.sysbox code{font-size:13px;overflow-wrap:anywhere}
+
+/* ---- term tabs (shared by manage + calculator) ---- */
+.terms{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 0}
+.tg{background:var(--panel);border-radius:14px;padding:6px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tg>span{text-align:center;font-family:var(--font-display);font-weight:600;font-size:14px;padding:2px 0}
+.tab{border:0;border-radius:10px;min-height:44px;padding:2px 4px;background:var(--surface);color:var(--ink);cursor:pointer;font-weight:700;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
+.tab small{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.tab[aria-selected=true]{background:var(--hw-bg);color:var(--ink);box-shadow:inset 0 0 0 2px var(--hw-line)}
+.tab[aria-selected=true] small{color:var(--ink)}
+.tab small.has{color:var(--good)}
+.tab[aria-selected=true] small.has{color:var(--ink)}
+.panelhead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:18px}
+
+/* ---- manage subjects ---- */
+.srow{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--ink);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.srow .head{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
+.srow .head>div{min-width:0}
+.srow b.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:var(--muted);display:block}
+.srow .nm{font-weight:700;overflow-wrap:anywhere}
+.cr{flex:none;background:var(--ink);color:var(--accent);border-radius:8px;padding:2px 10px;font-weight:700;font-size:14px;white-space:nowrap}
+.srow .acts{display:flex;gap:8px;flex-wrap:wrap}
+.srow .editbox{background:var(--panel);border-radius:10px;padding:2px 12px 12px}
+.grid2{display:grid;grid-template-columns:1fr 110px;gap:0 10px}
+.sum{display:flex;justify-content:space-between;gap:8px;align-items:center;background:var(--panel);border-radius:12px;padding:10px 14px;margin-top:12px;font-weight:700}
+
+/* ---- calculator ---- */
+.row{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center}
+.row .nm{font-weight:700;font-size:17px;overflow-wrap:anywhere;min-width:0}
+.row .cd{font-family:var(--font-display);font-size:17px;font-weight:600;letter-spacing:.02em;background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:1px 10px;display:block;width:fit-content;margin-bottom:4px}
+.row .crd{font-size:13px;color:var(--muted)}
+.row .crd b{color:var(--ink)}
+.row input{grid-column:2;grid-row:1 / span 2;width:84px;min-height:52px;text-align:center;font-size:22px;font-weight:700;font-family:var(--font-display);border:2px solid var(--line);border-radius:12px;background:var(--surface);padding:4px}
+.row input:focus{border-color:var(--ink)}
+.row.bad input{border-color:var(--danger)}
+.row .err{grid-column:1 / -1;color:var(--danger);font-size:13px;margin:0}
+.result{margin-top:12px;background:var(--hw-bg);border:2px solid var(--hw-line);border-radius:14px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center}
+.result .lab{font-size:14px;color:var(--muted)}
+.result .lab b{color:var(--ink)}
+.result .big{grid-row:1 / span 2;grid-column:2;font-family:var(--font-display);font-weight:600;font-size:38px;line-height:1;text-align:right;font-variant-numeric:tabular-nums}
+.result .big small{display:block;font-size:12px;font-weight:500;color:var(--muted);font-family:var(--font-body)}
+.total{margin-top:26px;background:var(--ink);color:var(--surface);border-radius:16px;padding:16px;color:#f4e9d7}
+.total h2{color:var(--accent)}
+.total .gpa{display:flex;align-items:baseline;gap:10px;margin:8px 0 2px;color:var(--accent)}
+.total .gpa b{font-family:var(--font-display);font-weight:600;font-size:56px;line-height:1;font-variant-numeric:tabular-nums}
+.total .gpa span{font-size:14px;color:#e8d9c2}
+.total table{color:inherit;width:100%;border-collapse:collapse;margin-top:12px;font-size:15px;font-variant-numeric:tabular-nums}
+.total th{font-size:12px;font-weight:700;color:#cdb998;text-align:right;padding:4px 0}
+.total th:first-child{text-align:left}
+.total td{padding:8px 0;border-top:1px solid #6b5846;text-align:right}
+.total td:first-child{text-align:left}
+.total td b{color:var(--accent)}
+.total .empty{border:1px dashed #8a7662;border-radius:10px;padding:12px;margin-top:10px;color:#e8d9c2;font-size:14px}
+.total .foot{font-size:12px;color:#cdb998;margin-top:10px}
+.clear{display:block;margin:14px auto 0;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:14px;min-height:44px}
+/* GPA สะสม: same yellow family as the term result box, one step deeper */
+.total{background:var(--total-bg);color:var(--ink);border:2px solid var(--total-line)}
+.total h2{color:var(--ink)}
+.total .gpa{color:var(--ink)}
+.total .gpa span{color:var(--muted)}
+.total th{color:var(--muted)}
+.total td{border-top:1px solid var(--total-rule)}
+.total td b{color:var(--ink)}
+.total .empty{border-color:var(--total-rule);color:var(--muted)}
+.total .foot{color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.tab,.menu button{transition:background .15s,color .15s}}
+</style>
+
+<div class="mockbar" role="tablist" aria-label="เลือกหน้าที่จะดูตัวอย่าง">
+  <small>ตัวอย่างหน้าตา (ยังไม่ใช่ของจริง) · เลือกหน้าที่ต้องการดู</small>
+  <button type="button" data-go="admin" aria-pressed="true">1 · Super admin</button>
+  <button type="button" data-go="manage" aria-pressed="false">2 · จัดการหลักสูตร</button>
+  <button type="button" data-go="calc" aria-pressed="false">3 · หน้าคำนวณ (user)</button>
+</div>
+
+<!-- ============ 1. SUPER ADMIN ============ -->
+<main class="wrap" id="screen-admin" data-screen="admin">
+  <h1>จัดการระบบ</h1>
+  <p class="sub">สำหรับผู้ดูแลระบบ (super admin) เท่านั้น</p>
+  <div class="who">🔐 เข้าสู่ระบบด้วย Cloudflare Access: <b>neverlock@gmail.com</b></div>
+
+  <nav class="menu" role="tablist" aria-label="เมนูจัดการ">
+    <button type="button" role="tab" data-menu="rooms" aria-selected="true"><b>🏫 ห้องเรียน</b><span>2 ห้อง</span></button>
+    <button type="button" role="tab" data-menu="gpa" aria-selected="false"><b>🎓 GPA</b><span>2 หลักสูตร</span></button>
+    <button type="button" role="tab" data-menu="sys" aria-selected="false"><b>⚙ ระบบ</b><span>พื้นที่ · สำรอง</span></button>
+  </nav>
+
+  <!-- rooms (existing page, now under a menu) -->
+  <section data-panel="rooms">
+    <div class="stats">
+      <div class="stat"><b>2</b><span>ห้องทั้งหมด</span></div>
+      <div class="stat"><b>2</b><span>เปิดใช้งาน</span></div>
+      <div class="stat"><b>36 KB</b><span>พื้นที่รูป</span></div>
+    </div>
+    <div class="sechead"><h2>ห้องเรียน</h2><span class="hint">หน้าเดิม ย้ายมาอยู่ใต้เมนูนี้</span></div>
+    <ul class="list">
+      <li class="room">
+        <div class="top"><h3>ป.5/1</h3><span class="pill on">เปิดใช้งาน</span></div>
+        <div class="url">/c/p5-1</div>
+        <div class="meta"><span>ภาคเรียนที่ 2/2569</span><span>นักเรียน <b>5</b></span><span>บันทึก <b>8</b></span><span>แอดมิน <b>1/1</b></span></div>
+        <div class="tools"><button class="sbtn" type="button">จัดการห้อง →</button><button class="sbtn" type="button">คัดลอกลิงก์</button><button class="sbtn" type="button">👤 แอดมินห้อง</button><button class="sbtn" type="button">ปิดห้อง</button><button class="ibtn" type="button" disabled aria-label="ลบห้อง">🗑</button></div>
+      </li>
+      <li class="room">
+        <div class="top"><h3>ป.6/2</h3><span class="pill on">เปิดใช้งาน</span></div>
+        <div class="url">/c/p6-2</div>
+        <div class="meta"><span>ภาคเรียนที่ 1/2570</span><span>นักเรียน <b>0</b></span><span>บันทึก <b>0</b></span><span>แอดมิน <b>1/1</b></span></div>
+        <div class="tools"><button class="sbtn" type="button">จัดการห้อง →</button><button class="sbtn" type="button">คัดลอกลิงก์</button><button class="sbtn" type="button">👤 แอดมินห้อง</button><button class="sbtn" type="button">ปิดห้อง</button><button class="ibtn" type="button" aria-label="ลบห้อง">🗑</button></div>
+      </li>
+    </ul>
+    <button class="btn alt" type="button" style="width:100%;margin-top:14px;min-height:48px">+ สร้างห้องใหม่</button>
+  </section>
+
+  <!-- GPA courses -->
+  <section data-panel="gpa" hidden>
+    <div class="stats">
+      <div class="stat"><b id="st-all">2</b><span>หลักสูตร</span></div>
+      <div class="stat"><b id="st-on">1</b><span>เปิดใช้งาน</span></div>
+      <div class="stat"><b>6</b><span>เทอม/หลักสูตร</span></div>
+    </div>
+    <div class="sechead"><h2>หลักสูตร GPA</h2><span class="hint">ลิงก์สาธารณะ ไม่ต้องล็อกอิน</span></div>
+    <ul class="list" id="courses">
+      <li class="room" data-course="iep">
+        <div class="top"><h3>หลักสูตร IEP</h3><span class="pill on">เปิดใช้งาน</span></div>
+        <div class="url">classroom.conf.in.th/u/iep</div>
+        <div class="meta"><span>6 เทอม</span><span>วิชา <b>28</b></span><span>หน่วยกิตรวม <b>34.5</b></span></div>
+        <div class="tools">
+          <button class="sbtn" type="button" data-go="manage">จัดการ →</button>
+          <button class="sbtn" type="button" data-copy="classroom.conf.in.th/u/iep">คัดลอกลิงก์</button>
+          <button class="sbtn" type="button" data-go="calc">ดูหน้าผู้ใช้ ↗</button>
+          <button class="sbtn" type="button" data-toggle>ปิดหลักสูตร</button>
+          <button class="ibtn" type="button" data-del aria-label="ลบหลักสูตร">🗑</button>
+        </div>
+      </li>
+      <li class="room off" data-course="mep">
+        <div class="top"><h3>หลักสูตรปกติ (ม.ต้น)</h3><span class="pill">ปิดอยู่</span></div>
+        <div class="url">classroom.conf.in.th/u/normal</div>
+        <div class="meta"><span>6 เทอม</span><span>วิชา <b>0</b></span><span>หน่วยกิตรวม <b>0</b></span></div>
+        <div class="tools">
+          <button class="sbtn" type="button" data-go="manage">จัดการ →</button>
+          <button class="sbtn" type="button" data-copy="classroom.conf.in.th/u/normal">คัดลอกลิงก์</button>
+          <button class="sbtn" type="button" data-go="calc">ดูหน้าผู้ใช้ ↗</button>
+          <button class="sbtn" type="button" data-toggle>เปิดหลักสูตรอีกครั้ง</button>
+          <button class="ibtn" type="button" data-del aria-label="ลบหลักสูตร">🗑</button>
+        </div>
+      </li>
+    </ul>
+
+    <form class="card add" id="newCourse" autocomplete="off">
+      <h2>+ สร้างลิงก์หลักสูตรใหม่</h2>
+      <label for="cslug">ชื่อลิงก์</label>
+      <div class="linkfield"><span class="pre">/u/</span><input type="text" id="cslug" maxlength="30" autocapitalize="none" spellcheck="false" placeholder="เช่น iep"></div>
+      <p class="preview">ลิงก์ที่ได้: <b id="curl">classroom.conf.in.th/u/…</b></p>
+      <p class="hint">ตัวอักษรอังกฤษพิมพ์เล็ก ตัวเลข และขีด 3–30 ตัว ตั้งแล้วเปลี่ยนไม่ได้</p>
+      <label for="cname">ชื่อหลักสูตรที่แสดง</label>
+      <input type="text" id="cname" maxlength="60" placeholder="เช่น หลักสูตร IEP">
+      <p class="err" id="cerr" role="alert" style="color:var(--danger);font-size:14px;margin:8px 0 0;min-height:1.2em"></p>
+      <button class="btn" type="submit">สร้างลิงก์</button>
+      <p class="hint">สร้างแล้วจะมีเทอมว่างให้ 6 เทอม (ม.1 เทอม 1 → ม.3 เทอม 2) แล้วกด “จัดการ” เพื่อเพิ่มวิชา</p>
+    </form>
+  </section>
+
+  <!-- system -->
+  <section data-panel="sys" hidden>
+    <div class="sechead"><h2>พื้นที่ใช้งาน</h2></div>
+    <div class="sysbox"><b>รูปภาพ 36 KB</b> จาก 10 GB ของพื้นที่ฟรี<div class="bar"><i style="width:2%"></i></div></div>
+    <div class="sechead"><h2>ผู้ดูแลระบบ</h2></div>
+    <div class="sysbox">เข้าสู่ระบบด้วยอีเมลที่อนุญาตใน Cloudflare Access เพิ่มหรือลบคนที่ Cloudflare Zero Trust → Applications ไม่ได้ทำในหน้านี้</div>
+    <div class="sechead"><h2>สำรองข้อมูล</h2></div>
+    <div class="sysbox">ส่งออกฐานข้อมูลด้วย <code>npx wrangler d1 export classroom-hub --remote --output backup.sql</code> แนะนำให้สำรองก่อนสิ้นภาคเรียนทุกครั้ง</div>
+  </section>
+
+  <details class="note"><summary>📝 ที่ผมตัดสินใจไว้ในหน้านี้ (ขอให้ตรวจ)</summary><ul>
+    <li>เมนูบนสุดแบบ 3 ปุ่ม ค้างอยู่บนหน้าจอเวลาเลื่อน: <b>ห้องเรียน</b> / <b>GPA</b> / <b>ระบบ</b> (ย้ายเรื่องพื้นที่ใช้งาน ผู้ดูแล สำรองข้อมูลมาไว้เมนูเดียว หน้าไม่ยาว)</li>
+    <li>การ์ดหลักสูตรมีปุ่มเหมือนการ์ดห้อง: จัดการ · คัดลอกลิงก์ · ปิดหลักสูตร · ลบ และ <b>เพิ่ม “ดูหน้าผู้ใช้ ↗”</b> เพื่อเปิดดูหน้าที่คนทั่วไปเห็น</li>
+    <li>ลบหลักสูตร: กดสองครั้งเพื่อยืนยัน (หลักสูตรไม่มีข้อมูลผู้ใช้เก็บไว้บนเซิร์ฟเวอร์ จึงลบได้ทุกกรณี)</li>
+    <li>prefix <b>/u/</b> ตายตัวไว้ก่อน (กันชนกับ /c และ /admin) ถ้าต้องการเปลี่ยน prefix บอกได้</li>
+    <li>ปิดหลักสูตร = คนเปิดลิงก์เห็นข้อความ “หลักสูตรนี้ปิดอยู่” คำนวณไม่ได้</li>
+  </ul></details>
+</main>
+
+<!-- ============ 2. MANAGE COURSE ============ -->
+<main class="wrap" id="screen-manage" data-screen="manage" hidden>
+  <a class="hint" href="#admin" data-go="admin" style="color:var(--muted)">← กลับหน้าจัดการระบบ</a>
+  <h1>จัดการหลักสูตร IEP</h1>
+  <p class="sub"><span class="url">classroom.conf.in.th/u/iep</span> · <span class="pill on">เปิดใช้งาน</span></p>
+  <hr style="height:3px;background:var(--accent);border:0;margin:10px 0 0">
+
+  <div class="terms" id="mTabs" role="tablist" aria-label="เทอม"></div>
+
+  <div class="panelhead"><h2 id="mTitle">ม.1 เทอม 1</h2><span class="hint tabular" id="mCount"></span></div>
+  <p class="hint">วิชาที่ใส่ในเทอมนี้คือวิชาที่ผู้ใช้จะเห็นช่องให้กรอกเกรด</p>
+  <ul class="list" id="mList"></ul>
+  <div class="sum"><span>หน่วยกิตรวมของเทอมนี้</span><span class="tabular" id="mSum">0</span></div>
+
+  <form class="card add" id="addSubj" autocomplete="off">
+    <h2>+ เพิ่มวิชา</h2>
+    <div class="grid2">
+      <div><label for="acode">รหัสวิชา (ไม่ใส่ก็ได้)</label><input type="text" id="acode" maxlength="20" placeholder="เช่น ค21101"></div>
+      <div><label for="acred">หน่วยกิต</label><input type="text" id="acred" inputmode="decimal" maxlength="4" placeholder="1.5"></div>
+    </div>
+    <label for="aname">ชื่อวิชา</label>
+    <input type="text" id="aname" maxlength="100" placeholder="เช่น คณิตศาสตร์พื้นฐาน">
+    <p class="err" id="aerr" role="alert" style="color:var(--danger);font-size:14px;margin:8px 0 0;min-height:1.2em"></p>
+    <button class="btn" type="submit">เพิ่มวิชา</button>
+  </form>
+  <button class="btn alt" type="button" id="copyFrom" style="width:100%;margin-top:12px;min-height:48px">⧉ คัดลอกวิชาจากเทอมอื่นมาใส่เทอมนี้</button>
+
+  <details class="note" open><summary>⚙ ตั้งค่าหลักสูตร</summary>
+    <label for="sname">ชื่อหลักสูตรที่แสดง</label>
+    <input type="text" id="sname" value="หลักสูตร IEP">
+    <label for="snote">ข้อความท้ายหน้า (ไม่ใส่ก็ได้)</label>
+    <input type="text" id="snote" value="ใช้ประกอบการประเมินเบื้องต้นสำหรับสมัครโควตา ม.4 ผลจริงยึดตามระเบียนแสดงผลการเรียนของโรงเรียน">
+    <p class="hint">ข้อความนี้แสดงใต้การ์ดสรุปในหน้าผู้ใช้</p>
+  </details>
+
+  <details class="note"><summary>📝 ที่ผมตัดสินใจไว้ในหน้านี้ (ขอให้ตรวจ)</summary><ul>
+    <li>แท็บ 6 เทอมจัดเป็น 3 กลุ่ม ม.1 / ม.2 / ม.3 กลุ่มละ 2 ปุ่ม (เทอม 1, เทอม 2) กดแล้วเปลี่ยนการ์ดทันที ตัวเลขใต้ชื่อแท็บคือจำนวนวิชา</li>
+    <li>แต่ละวิชามี: รหัสวิชา (ไม่บังคับ) · ชื่อวิชา · หน่วยกิต (0.5 ขึ้นไป ครั้งละ 0.5) ปุ่ม ▲▼ จัดลำดับ ✎ แก้ไข 🗑 ลบ (กดสองครั้งยืนยัน)</li>
+    <li>เพิ่มปุ่มที่คิดว่าช่วยได้: <b>คัดลอกวิชาจากเทอมอื่น</b> (เทอมที่วิชาซ้ำกันเยอะ) และช่อง <b>ข้อความท้ายหน้า</b></li>
+    <li>ใช้หน่วยกิตเป็นตัวถ่วงน้ำหนัก (ในโจทย์พิมพ์ “หน่วยกิจ” ผมเข้าใจว่าคือหน่วยกิต)</li>
+  </ul></details>
+</main>
+
+<!-- ============ 3. USER CALCULATOR ============ -->
+<main class="wrap" id="screen-calc" data-screen="calc" hidden>
+  <span class="mocktag">ตัวอย่างข้อมูล: วิชาและเกรดด้านล่างเป็นตัวอย่าง</span>
+  <h1>คำนวณ GPA</h1>
+  <p class="sub">หลักสูตร IEP · ม.1 – ม.3</p>
+  <hr style="height:3px;background:var(--accent);border:0;margin:10px 0 0">
+  <p class="hint" style="margin-top:10px">กรอกเกรดแต่ละวิชา (0, 0.5, 1 … 4) ระบบคำนวณให้ทันที ข้อมูลอยู่ในเครื่องนี้เท่านั้น ไม่ส่งขึ้นเซิร์ฟเวอร์</p>
+
+  <div class="terms" id="cTabs" role="tablist" aria-label="เลือกเทอม"></div>
+
+  <div class="panelhead"><h2 id="cTitle">ม.1 เทอม 1</h2><span class="hint tabular" id="cFill"></span></div>
+  <ul class="list" id="cList"></ul>
+  <div class="result" id="cResult"></div>
+
+  <section class="total" aria-labelledby="totH">
+    <h2 id="totH">สรุป GPA สะสม</h2>
+    <div id="totBody"></div>
+    <p class="foot">GPA = ผลรวม (เกรด × หน่วยกิต) ÷ ผลรวมหน่วยกิต นับเฉพาะวิชาที่กรอกเกรดแล้ว</p>
+  </section>
+  <p class="hint" id="cNote" style="text-align:center;margin-top:12px">ใช้ประกอบการประเมินเบื้องต้นสำหรับสมัครโควตา ม.4 ผลจริงยึดตามระเบียนแสดงผลการเรียนของโรงเรียน</p>
+  <button class="clear" type="button" id="cClear">ล้างเกรดที่กรอกทั้งหมด</button>
+
+  <details class="note"><summary>📝 ที่ผมตัดสินใจไว้ในหน้านี้ (ขอให้ตรวจ)</summary><ul>
+    <li>ช่องกรอกรับเลขเกรดอย่างเดียว 0–4 (ครั้งละ 0.5) ถ้าใส่ค่าอื่นจะขึ้นข้อความเตือนและไม่นับในการคำนวณ</li>
+    <li>GPA สรุปรวมคิดจาก <b>หน่วยกิตทั้งหมดทุกเทอม</b> (ไม่ใช่เฉลี่ย GPA ของแต่ละเทอม) แสดง 2 ตำแหน่ง ปัดตามหลักปกติ</li>
+    <li>เก็บเกรดที่กรอกไว้ในเครื่องผู้ใช้ (ปิดแล้วเปิดใหม่ยังอยู่) ไม่ต้องล็อกอิน ไม่มีข้อมูลส่วนตัวบนเซิร์ฟเวอร์</li>
+    <li>การ์ดสรุปด้านล่างแสดงเฉพาะเทอมที่มีเกรดแล้ว ตามที่ขอ</li>
+  </ul></details>
+</main>
+
+<script>
+(function(){
+  const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+  const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let toastTimer;
+  function toast(t){let e=$('.toast');if(!e){e=document.createElement('div');e.className='toast';e.setAttribute('role','status');document.body.appendChild(e)}e.textContent=t;e.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.hidden=true,2200)}
+  async function copy(t){try{await navigator.clipboard.writeText(t);toast('คัดลอกลิงก์แล้ว')}catch(e){toast('คัดลอกไม่ได้ ลองกดค้างที่ลิงก์เพื่อคัดลอก')}}
+  const store={get(k){try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+  /* ---------- screens ---------- */
+  function show(name){
+    if(!['admin','manage','calc'].includes(name))name='admin';
+    $$('[data-screen]').forEach(s=>s.hidden=s.dataset.screen!==name);
+    $$('.mockbar [data-go]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.go===name)));
+    if(location.hash!=='#'+name)history.replaceState(null,'','#'+name);
+    window.scrollTo(0,0);
+  }
+  document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g){e.preventDefault();show(g.dataset.go)}});
+  window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
+
+  /* ---------- super admin menu ---------- */
+  $$('[data-menu]').forEach(b=>b.addEventListener('click',()=>{
+    $$('[data-menu]').forEach(x=>x.setAttribute('aria-selected',String(x===b)));
+    $$('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!==b.dataset.menu);
+  }));
+  $$('[data-copy]').forEach(b=>b.addEventListener('click',()=>copy('https://'+b.dataset.copy)));
+  function stats(){const all=$$('#courses .room');$('#st-all').textContent=all.length;$('#st-on').textContent=all.filter(r=>!r.classList.contains('off')).length;$('[data-menu=gpa] span').textContent=all.length+' หลักสูตร'}
+  $('#courses').addEventListener('click',e=>{
+    const li=e.target.closest('.room');if(!li)return;
+    if(e.target.closest('[data-toggle]')){
+      const off=li.classList.toggle('off');
+      $('.pill',li).className='pill'+(off?'':' on');$('.pill',li).textContent=off?'ปิดอยู่':'เปิดใช้งาน';
+      e.target.closest('[data-toggle]').textContent=off?'เปิดหลักสูตรอีกครั้ง':'ปิดหลักสูตร';stats();
+    }
+    const d=e.target.closest('[data-del]');
+    if(d){if(!d.classList.contains('sure')){d.classList.add('sure');d.textContent='ยืนยันลบ?';setTimeout(()=>{d.classList.remove('sure');d.textContent='🗑'},3000)}else{li.remove();stats();toast('ลบหลักสูตรแล้ว')}}
+  });
+  const slugOk=s=>/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(s);
+  $('#cslug').addEventListener('input',e=>{e.target.value=e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'');$('#curl').textContent='classroom.conf.in.th/u/'+(e.target.value||'…')});
+  $('#newCourse').addEventListener('submit',e=>{
+    e.preventDefault();const s=$('#cslug').value.trim(),n=$('#cname').value.trim();
+    if(!slugOk(s))return $('#cerr').textContent='ชื่อลิงก์ใช้ a–z 0–9 และขีด 3–30 ตัว ขึ้นต้น/ลงท้ายด้วยตัวอักษรหรือตัวเลข';
+    if(!n)return $('#cerr').textContent='กรุณาตั้งชื่อหลักสูตรที่แสดง';
+    $('#cerr').textContent='';
+    const li=document.createElement('li');li.className='room fresh';li.dataset.course=s;
+    li.innerHTML='<div class="top"><h3>'+esc(n)+'</h3><span class="pill on">เปิดใช้งาน</span></div><div class="url">classroom.conf.in.th/u/'+esc(s)+'</div><div class="meta"><span>6 เทอม</span><span>วิชา <b>0</b></span><span>หน่วยกิตรวม <b>0</b></span></div><div class="tools"><button class="sbtn" type="button" data-go="manage">จัดการ →</button><button class="sbtn" type="button" data-copy="classroom.conf.in.th/u/'+esc(s)+'">คัดลอกลิงก์</button><button class="sbtn" type="button" data-go="calc">ดูหน้าผู้ใช้ ↗</button><button class="sbtn" type="button" data-toggle>ปิดหลักสูตร</button><button class="ibtn" type="button" data-del aria-label="ลบหลักสูตร">🗑</button></div>';
+    $('#courses').prepend(li);$('[data-copy]',li).addEventListener('click',ev=>copy('https://'+ev.currentTarget.dataset.copy));
+    stats();e.target.reset();$('#curl').textContent='classroom.conf.in.th/u/…';toast('สร้างลิงก์ /u/'+s+' แล้ว');li.scrollIntoView({behavior:'smooth',block:'center'});
+  });
+
+  /* ---------- shared sample data ---------- */
+  const TERMS=[];for(let g=1;g<=3;g++)for(let t=1;t<=2;t++)TERMS.push({id:g+'-'+t,g,t,label:'ม.'+g+' เทอม '+t});
+  const base=[['ค','คณิตศาสตร์พื้นฐาน',1.5],['ว','วิทยาศาสตร์และเทคโนโลยี',1.5],['อ','ภาษาอังกฤษ',1.5],['ท','ภาษาไทย',1.5],['ส','สังคมศึกษา',1],];
+  const subs={};
+  TERMS.forEach(T=>{subs[T.id]=base.map((b,i)=>({code:b[0]+'2'+T.g+'10'+T.t,name:b[1],credit:b[2]}));if(T.g>1)subs[T.id].push({code:'ว2'+T.g+'10'+(T.t+2),name:'วิทยาการคำนวณ',credit:0.5})});
+  subs['3-2']=subs['3-2'].slice(0,4);
+  const grades={'1-1':['4','3.5','3','4','3'],'1-2':['3.5','3','3.5','4','4'],'2-1':['3','3.5','','','']};
+  let cur='1-1';
+  const nf=v=>Number.isInteger(v)?String(v):v.toFixed(1);
+
+  function tabs(el,count,small,pick){
+    el.innerHTML=[1,2,3].map(g=>'<div class="tg" role="group" aria-label="ม.'+g+'"><span>ม.'+g+'</span>'+[1,2].map(t=>{const id=g+'-'+t;return '<button type="button" class="tab" role="tab" data-t="'+id+'" aria-selected="'+(id===cur)+'">เทอม '+t+small(id)+'</button>'}).join('')+'</div>').join('');
+    $$('.tab',el).forEach(b=>b.addEventListener('click',()=>{cur=b.dataset.t;pick()}));
+  }
+
+  /* ---------- manage ---------- */
+  let editing=null,delArm=null;
+  function renderManage(){
+    const list=subs[cur],T=TERMS.find(t=>t.id===cur);
+    tabs($('#mTabs'),0,id=>'<small>'+subs[id].length+' วิชา</small>',renderManage);
+    $('#mTitle').textContent=T.label;$('#mCount').textContent=list.length+' วิชา';
+    $('#mSum').textContent=nf(list.reduce((a,s)=>a+s.credit,0))+' หน่วยกิต';
+    $('#mList').innerHTML=list.length?list.map((s,i)=>{
+      const ed=editing===i;
+      return '<li class="srow" data-i="'+i+'"><div class="head"><div><b class="code">'+esc(s.code||'—')+'</b><span class="nm">'+esc(s.name)+'</span></div><span class="cr">'+nf(s.credit)+' หน่วยกิต</span></div>'+
+      '<div class="acts"><button class="ibtn" data-a="up" aria-label="ขึ้น"'+(i===0?' disabled':'')+'>▲</button><button class="ibtn" data-a="down" aria-label="ลง"'+(i===list.length-1?' disabled':'')+'>▼</button><button class="ibtn" data-a="edit" aria-label="แก้ไข">✎</button><button class="ibtn'+(delArm===i?' sure':'')+'" data-a="del" aria-label="ลบ">'+(delArm===i?'ยืนยันลบ?':'🗑')+'</button></div>'+
+      (ed?'<div class="editbox"><div class="grid2"><div><label for="ec'+i+'">รหัสวิชา</label><input type="text" id="ec'+i+'" value="'+esc(s.code)+'"></div><div><label for="er'+i+'">หน่วยกิต</label><input type="text" id="er'+i+'" inputmode="decimal" value="'+nf(s.credit)+'"></div></div><label for="en'+i+'">ชื่อวิชา</label><input type="text" id="en'+i+'" value="'+esc(s.name)+'"><div class="tools"><button class="btn" data-a="save" style="margin-top:12px;flex:1">บันทึก</button><button class="btn alt" data-a="cancel" style="margin-top:12px;min-height:48px">ยกเลิก</button></div></div>':'')+'</li>';
+    }).join(''):'<li class="hint" style="text-align:center;padding:14px;border:1px dashed var(--line);border-radius:12px">เทอมนี้ยังไม่มีวิชา เพิ่มด้านล่างหรือคัดลอกจากเทอมอื่น</li>';
+  }
+  $('#mList').addEventListener('click',e=>{
+    const b=e.target.closest('[data-a]');if(!b)return;const i=+b.closest('.srow').dataset.i,list=subs[cur],a=b.dataset.a;
+    if(a==='up'||a==='down'){const j=a==='up'?i-1:i+1;[list[i],list[j]]=[list[j],list[i]];editing=null}
+    else if(a==='edit')editing=editing===i?null:i;
+    else if(a==='cancel')editing=null;
+    else if(a==='save'){const c=parseFloat($('#er'+i).value);if(!($('#en'+i).value.trim())||!(c>=0.5)||(c*2)%1!==0){toast('ชื่อวิชาห้ามว่าง หน่วยกิตต้องเป็น 0.5, 1, 1.5 …');return}list[i]={code:$('#ec'+i).value.trim(),name:$('#en'+i).value.trim(),credit:c};editing=null;toast('บันทึกวิชาแล้ว')}
+    else if(a==='del'){if(delArm!==i){delArm=i;setTimeout(()=>{delArm=null;renderManage()},3000)}else{list.splice(i,1);delArm=null;editing=null;toast('ลบวิชาแล้ว')}}
+    renderManage();
+  });
+  $('#addSubj').addEventListener('submit',e=>{
+    e.preventDefault();const n=$('#aname').value.trim(),c=parseFloat($('#acred').value);
+    if(!n)return $('#aerr').textContent='กรุณาใส่ชื่อวิชา';
+    if(!(c>=0.5)||(c*2)%1!==0)return $('#aerr').textContent='หน่วยกิตต้องเป็น 0.5, 1, 1.5 … (ครั้งละ 0.5)';
+    $('#aerr').textContent='';subs[cur].push({code:$('#acode').value.trim(),name:n,credit:c});e.target.reset();renderManage();toast('เพิ่มวิชาแล้ว');
+  });
+  $('#copyFrom').addEventListener('click',()=>{const i=TERMS.findIndex(t=>t.id===cur),from=TERMS[i>0?i-1:1].id;subs[cur]=subs[from].map(s=>({...s}));renderManage();toast('คัดลอกวิชาจาก '+TERMS.find(t=>t.id===from).label+' แล้ว (ตัวอย่าง)')});
+
+  /* ---------- calculator ---------- */
+  const KEY='gpa-mock-iep';
+  const saved=store.get(KEY);
+  if(saved)Object.assign(grades,saved);
+  const okGrade=v=>{const n=parseFloat(v);return v!==''&&!isNaN(n)&&n>=0&&n<=4&&(n*2)%1===0};
+  function calc(id){let pts=0,cr=0,n=0;subs[id].forEach((s,i)=>{const v=(grades[id]||[])[i];if(v!==undefined&&okGrade(v)){pts+=parseFloat(v)*s.credit;cr+=s.credit;n++}});return{pts,cr,n,total:subs[id].length,gpa:cr?pts/cr:null}}
+  function renderCalc(){
+    tabs($('#cTabs'),0,id=>{const r=calc(id);return '<small class="'+(r.n?'has':'')+'">'+(r.n?'GPA '+r.gpa.toFixed(2):'ยังไม่กรอก')+'</small>'},renderCalc);
+    const T=TERMS.find(t=>t.id===cur),list=subs[cur];
+    $('#cTitle').textContent=T.label;
+    $('#cList').innerHTML=list.length?list.map((s,i)=>{const v=(grades[cur]||[])[i]||'';const bad=v!==''&&!okGrade(v);
+      return '<li class="row'+(bad?' bad':'')+'"><span class="nm"><span class="cd">'+esc(s.code)+'</span>'+esc(s.name)+'</span><input type="text" inputmode="decimal" id="g'+i+'" data-i="'+i+'" value="'+esc(v)+'" placeholder="0–4" maxlength="3" autocomplete="off" aria-label="เกรด '+esc(s.name)+'"><span class="crd"><b>'+nf(s.credit)+'</b> หน่วยกิต</span>'+(bad?'<p class="err" role="alert">ใส่เกรด 0–4 (ครั้งละ 0.5) เช่น 3 หรือ 3.5</p>':'')+'</li>'}).join(''):'<li class="hint">เทอมนี้ยังไม่มีวิชา</li>';
+    drawResult();drawTotal();
+  }
+  function drawResult(){const r=calc(cur),all=subs[cur].reduce((a,s)=>a+s.credit,0);
+    $('#cFill').textContent='กรอกแล้ว '+r.n+'/'+r.total+' วิชา';
+    $('#cResult').innerHTML='<span class="lab">หน่วยกิตรวมเทอมนี้ <b class="tabular">'+nf(all)+'</b></span><span class="lab">นับในเกรด <b class="tabular">'+nf(r.cr)+'</b> หน่วยกิต</span><span class="big">'+(r.gpa===null?'–':r.gpa.toFixed(2))+'<small>GPA เทอมนี้</small></span>';
+  }
+  function drawTotal(){
+    const rows=TERMS.map(t=>({t,...calc(t.id)})).filter(r=>r.n>0);
+    if(!rows.length){$('#totBody').innerHTML='<div class="empty">ยังไม่มีเทอมที่กรอกเกรด กรอกเกรดด้านบนแล้วสรุปจะขึ้นที่นี่</div>';return}
+    const pts=rows.reduce((a,r)=>a+r.pts,0),cr=rows.reduce((a,r)=>a+r.cr,0);
+    $('#totBody').innerHTML='<div class="gpa"><b>'+(pts/cr).toFixed(2)+'</b><span>GPA สะสม · '+nf(cr)+' หน่วยกิต · '+rows.length+' เทอม</span></div><table><thead><tr><th>เทอม</th><th>หน่วยกิต</th><th>GPA</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+r.t.label+(r.n<r.total?' <span style="font-size:12px;color:var(--muted)">('+r.n+'/'+r.total+' วิชา)</span>':'')+'</td><td>'+nf(r.cr)+'</td><td><b>'+r.gpa.toFixed(2)+'</b></td></tr>').join('')+'</tbody></table>';
+  }
+  $('#cList').addEventListener('input',e=>{
+    const inp=e.target.closest('input');if(!inp)return;const i=+inp.dataset.i;
+    inp.value=inp.value.replace(/[^0-9.]/g,'');(grades[cur]=grades[cur]||[])[i]=inp.value;store.set(KEY,grades);
+    const row=inp.closest('.row'),bad=inp.value!==''&&!okGrade(inp.value);row.classList.toggle('bad',bad);
+    let er=$('.err',row);if(bad&&!er){er=document.createElement('p');er.className='err';er.setAttribute('role','alert');er.textContent='ใส่เกรด 0–4 (ครั้งละ 0.5) เช่น 3 หรือ 3.5';row.appendChild(er)}if(!bad&&er)er.remove();
+    drawResult();drawTotal();
+    const small=$('.tab[data-t="'+cur+'"] small');const r=calc(cur);small.className=r.n?'has':'';small.textContent=r.n?'GPA '+r.gpa.toFixed(2):'ยังไม่กรอก';
+  });
+  let clearArm=false;
+  $('#cClear').addEventListener('click',e=>{if(!clearArm){clearArm=true;e.target.textContent='กดอีกครั้งเพื่อยืนยันล้างทั้งหมด';setTimeout(()=>{clearArm=false;e.target.textContent='ล้างเกรดที่กรอกทั้งหมด'},3000);return}Object.keys(grades).forEach(k=>delete grades[k]);store.set(KEY,grades);clearArm=false;e.target.textContent='ล้างเกรดที่กรอกทั้งหมด';renderCalc();toast('ล้างเกรดแล้ว')});
+  $('#snote').addEventListener('input',e=>$('#cNote').textContent=e.target.value);
+
+  /* tabs share `cur` but each screen re-renders on show */
+  const _show=show;show=function(n){_show(n);if(n==='manage')renderManage();if(n==='calc')renderCalc()};
+  renderManage();renderCalc();stats();show(location.hash.slice(1)||'admin');
+})();
+</script>

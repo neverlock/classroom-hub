@@ -1,18 +1,18 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { and, asc, eq, sql } from 'drizzle-orm';
-import { attachments, classAdmins, classes, entries, students, subjects, terms } from '#lib/server/db/schema.js';
+import { classAdmins, classes, entries, gpaCourses, gpaSubjects, students, subjects, terms } from '#lib/server/db/schema.js';
 import { hashPassword } from '#lib/server/crypto.js';
 import { useEnv } from '#lib/server/env.js';
-import { loadAdminOverview } from '#lib/server/queries.js';
+import { loadAdminOverview, loadGpaCourses } from '#lib/server/queries.js';
 import { iterationsFor } from '#lib/server/room.js';
 import { setSuperCookie } from '#lib/server/session.js';
 import { addDays, todayInBangkok } from '#lib/dates.js';
-import { readText, validateAdminInput, validatePassword, validateSlug, validateTerm } from '#lib/validate.js';
+import { lengthError, readText, validateAdminInput, validatePassword, validateSlug, validateTerm } from '#lib/validate.js';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
 	const { db } = useEnv(event);
-	const { rooms, entryRows, studentRows, admins, postRows, byteRows } = await loadAdminOverview(db);
+	const [{ rooms, entryRows, studentRows, admins, postRows, byteRows }, courses] = await Promise.all([loadAdminOverview(db), loadGpaCourses(db)]);
 	const entryCount = new Map(entryRows.map((r) => [r.id, r.n]));
 	const studentCount = new Map(studentRows.map((r) => [r.id, r.n]));
 	const posts = new Map(postRows.map((r) => [r.id, r.n]));
@@ -24,6 +24,7 @@ export const load: PageServerLoad = async (event) => {
 		freeBytes: 10 * 1024 ** 3,
 		today,
 		defaults: { start: today, end: addDays(today, 120) },
+		courses: courses.map((c) => ({ id: c.id, slug: c.slug, name: c.name, active: c.active, subjects: c.subjects, credit2: c.credit2 })),
 		rooms: rooms.map((r) => ({
 			id: r.id,
 			slug: r.slug,
@@ -135,6 +136,35 @@ export const actions: Actions = {
 		if ((used?.n ?? 0) > 0) return fail(400, { error: 'ลบไม่ได้ เพราะแอดมินคนนี้เคยบันทึกข้อมูลแล้ว ให้ปิดใช้งานแทน' });
 		await db.delete(classAdmins).where(eq(classAdmins.id, id));
 		return { deleted: true };
+	},
+
+	createCourse: async (event) => {
+		const { db } = useEnv(event);
+		const f = await event.request.formData();
+		const slug = String(f.get('slug') ?? '').trim().toLowerCase();
+		const name = readText(f.get('name'));
+		const err = validateSlug(slug) ?? (!name ? 'กรุณาตั้งชื่อหลักสูตรที่แสดง' : lengthError([['ชื่อหลักสูตร', name, 60]]));
+		if (err) return fail(400, { error: err, form: 'course' });
+		if (await db.select({ id: gpaCourses.id }).from(gpaCourses).where(eq(gpaCourses.slug, slug)).get()) return fail(400, { error: `ชื่อลิงก์ /u/${slug} ถูกใช้แล้ว`, form: 'course' });
+		await db.insert(gpaCourses).values({ slug, name });
+		return { createdCourse: { slug, name } };
+	},
+
+	toggleCourse: async (event) => {
+		const { db } = useEnv(event);
+		const id = num((await event.request.formData()).get('id'));
+		const c = await db.select().from(gpaCourses).where(eq(gpaCourses.id, id)).get();
+		if (!c) return fail(404, { error: 'ไม่พบหลักสูตร', form: 'course' });
+		await db.update(gpaCourses).set({ active: !c.active }).where(eq(gpaCourses.id, id));
+		return { toggledCourse: c.name, active: !c.active };
+	},
+
+	/** Courses hold no visitor data (grades never reach the server), so deleting only loses the subject lists. */
+	deleteCourse: async (event) => {
+		const { db } = useEnv(event);
+		const id = num((await event.request.formData()).get('id'));
+		await db.batch([db.delete(gpaSubjects).where(eq(gpaSubjects.courseId, id)), db.delete(gpaCourses).where(eq(gpaCourses.id, id))]);
+		return { deletedCourse: true };
 	},
 
 	/** Opens a room's manage page as super admin without a room login. */

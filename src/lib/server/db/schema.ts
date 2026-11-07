@@ -145,3 +145,34 @@ export const authAttempts = sqliteTable('auth_attempts', {
 	count: integer('count').notNull(),
 	windowStart: integer('window_start').notNull()
 });
+
+/**
+ * A public GPA calculator at /u/<slug>. Only the course's SUBJECTS live here (set by the super admin).
+ * Grades typed by visitors never reach the server: they are computed in the browser.
+ */
+export const gpaCourses = sqliteTable('gpa_courses', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	slug: text('slug').notNull().unique(),
+	name: text('name').notNull(),
+	/** Shown under the summary on the public page. */
+	note: text('note').notNull().default(''),
+	/** 0 = closed: the public page says so and does not calculate. */
+	active: integer('active', { mode: 'boolean' }).notNull().default(true),
+	createdAt: integer('created_at').notNull().default(now)
+});
+
+export const gpaSubjects = sqliteTable(
+	'gpa_subjects',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		courseId: integer('course_id').notNull().references(() => gpaCourses.id),
+		/** 0..5 = ม.1 เทอม 1, ม.1 เทอม 2, ม.2 เทอม 1 … ม.3 เทอม 2 */
+		termNo: integer('term_no').notNull(),
+		code: text('code').notNull().default(''),
+		name: text('name').notNull(),
+		/** Credits × 2, so 1.5 credits is stored as 3 and sums stay exact integers. */
+		credit2: integer('credit2').notNull(),
+		sortOrder: integer('sort_order').notNull().default(0)
+	},
+	(t) => [index('gpa_subjects_course_idx').on(t.courseId, t.termNo, t.sortOrder)]
+);
