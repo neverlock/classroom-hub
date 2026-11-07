@@ -3,8 +3,8 @@ import { getPlatformProxy } from 'wrangler';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getDb } from './db';
-import { attachments, classAdmins, classes, comments, entries, students, subjects, terms } from './db/schema';
-import { loadAdminOverview, loadCard, loadMain, loadManageData, loadRoomBundle } from './queries';
+import { attachments, classAdmins, classes, comments, entries, gpaCourses, gpaSubjects, students, subjects, terms } from './db/schema';
+import { loadAdminOverview, loadCard, loadGpaCourse, loadGpaCourses, loadMain, loadManageData, loadRoomBundle } from './queries';
 
 /**
  * Runs the real queries against a real (in-memory) D1 from wrangler's local runtime.
@@ -149,5 +149,29 @@ describe('manage page and /admin overview queries against D1', () => {
 		expect(o.admins.find((a) => a.classId === cls.id)).toMatchObject({ id: adm.id, display: 'แม่น้องมาย', username: 'mai', active: true });
 		expect(o.postRows.find((r) => r.id === adm.id)?.n).toBe(1);
 		expect(o.byteRows[0].n).toBeGreaterThanOrEqual(5 + 7 + 9);
+	}, 60_000);
+});
+
+describe('GPA course queries against D1', () => {
+	it('lists courses with their totals and loads one course with ordered subjects', async () => {
+		const iep = await db.insert(gpaCourses).values({ slug: 'iep', name: 'หลักสูตร IEP', note: 'หมายเหตุ' }).returning().get();
+		const other = await db.insert(gpaCourses).values({ slug: 'normal', name: 'ปกติ', active: false }).returning().get();
+		const add = (courseId: number, termNo: number, name: string, credit2: number, sortOrder: number) => db.insert(gpaSubjects).values({ courseId, termNo, code: 'c' + sortOrder, name, credit2, sortOrder }).returning().get();
+		await add(other.id, 0, 'ของหลักสูตรอื่น', 9, 1); // must never leak into iep
+		const eng = await add(iep.id, 1, 'อังกฤษ', 3, 2);
+		const math = await add(iep.id, 0, 'คณิต', 3, 2);
+		const sci = await add(iep.id, 0, 'วิทย์', 1, 1);
+
+		const list = await loadGpaCourses(db);
+		const row = list.find((c) => c.slug === 'iep')!;
+		expect([row.id, row.subjects, row.credit2]).toEqual([iep.id, 3, 7]);
+		expect(list.find((c) => c.slug === 'normal')).toMatchObject({ active: false, subjects: 1, credit2: 9 });
+
+		const one = await loadGpaCourse(db, 'iep');
+		expect(one?.course).toMatchObject({ id: iep.id, name: 'หลักสูตร IEP', note: 'หมายเหตุ', active: true });
+		// by term, then by sort order: ids are deliberately out of order
+		expect(one?.subjects.map((s) => [s.termNo, s.id])).toEqual([[0, sci.id], [0, math.id], [1, eng.id]]);
+		expect(one?.subjects.every((s) => s.courseId === iep.id)).toBe(true);
+		expect(await loadGpaCourse(db, 'nope')).toBeNull();
 	}, 60_000);
 });
