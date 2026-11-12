@@ -65,6 +65,15 @@ input[type='file'] { width: 100%; max-width: 100%; min-width: 0; font-size: 14px
 .cta { display: block; width: 100%; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 12px; padding: 15px 16px; font-family: var(--font-display); font-weight: 600; font-size: 18px; cursor: pointer; }
 .cta[aria-expanded='true'] { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .cta:hover { filter: brightness(0.96); }
+/* save button + Login/Logout on one row; the auth button is as tall as the save button but narrower and outlined */
+.actions { display: flex; gap: 8px; align-items: stretch; }
+.actions .cta { flex: 1 1 auto; min-width: 0; width: auto; min-height: 56px; padding: 8px 12px; font-size: 17px; line-height: 1.25; text-wrap: balance; }
+.authbtn { flex: none; align-self: stretch; min-height: 56px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font-weight: 700; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.authbtn svg { width: 18px; height: 18px; flex: none; }
+.authbtn[aria-expanded='true'] { background: var(--chip-bg); color: var(--chip-ink); }
+.whoami { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+.whoami b { color: var(--ink); }
+.ptitle { font-family: var(--font-display); font-weight: 600; font-size: 17px; margin: 10px 0 0; }
 .linkbtn { background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 0 6px; min-height: 44px; font-size: 14px; }
 .ibtn { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 44px; height: 44px; padding: 0 10px; cursor: pointer; font-size: 17px; }
 .ibtn:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -92,6 +101,7 @@ input[type='file'] { width: 100%; max-width: 100%; min-width: 0; font-size: 14px
 /* ---------- panel + form (main page) ---------- */
 .panel { background: var(--panel); border: 2px solid var(--line); border-top: 0; border-radius: 0 0 14px 14px; padding: 20px clamp(14px, 3vw, 28px) 24px; margin-bottom: 6px; }
 .panel h3 { margin: 0 0 14px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); font-size: 19px; }
+.panel.detached { border: 1.5px dashed var(--line); border-radius: 14px; margin-top: 10px; padding-top: 6px; }
 .who { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; font-size: 14px; color: var(--muted); margin-bottom: 2px; }
 .note-edit { background: var(--hw-bg); border: 1px solid var(--hw-line); border-radius: 10px; padding: 8px 12px; font-size: 14px; margin-top: 12px; }
 .thumbs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
@@ -253,8 +263,6 @@ details.over[open] > summary::after { content: '▾ ย่อ'; }
 .picbtn { border: 0; background: none; padding: 0; line-height: 0; cursor: zoom-in; border-radius: 8px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-details.adminlogin { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 4px; }
-details.adminlogin > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--muted); font-size: 14px; }
 
 /* ---- Super admin menu ---- */
 .a-menu { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--panel); border-radius: 14px; padding: 4px; margin: 14px 0 0; box-shadow: 0 6px 0 var(--surface); }
