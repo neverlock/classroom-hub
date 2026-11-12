@@ -3,7 +3,7 @@ import { getPlatformProxy } from 'wrangler';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getDb } from './db';
-import { attachments, classAdmins, classes, comments, entries, gpaCourses, gpaSubjects, homeworkMarks, students, subjects, terms } from './db/schema';
+import { attachments, classAdmins, classes, commentReads, comments, entries, gpaCourses, gpaSubjects, homeworkMarks, students, subjects, terms } from './db/schema';
 import { doneMarks, loadAdminOverview, loadCard, loadGpaCourse, loadGpaCourses, loadMain, loadManageData, loadRoomBundle } from './queries';
 
 /**
@@ -205,5 +205,43 @@ describe('homework "ทำแล้ว" marks against D1', () => {
 		expect(anon.doneIds).toEqual([]);
 		// one mark per student per entry
 		await expect(db.insert(homeworkMarks).values({ studentId: r1.a.id, entryId: r1.e1.id })).rejects.toThrow();
+	}, 60_000);
+});
+
+describe('unread comment data against D1', () => {
+	it('gives other people\'s comment ids per homework row, flags own comments, and returns read marks and the newest id', async () => {
+		const cls = await db.insert(classes).values({ slug: 'unread' }).returning().get();
+		const term = await db.insert(terms).values({ classId: cls.id, name: 't', classLabel: 'x', startDate: '2026-08-01', endDate: '2027-03-31' }).returning().get();
+		await db.update(classes).set({ currentTermId: term.id }).where(eq(classes.id, cls.id));
+		const sub = await db.insert(subjects).values({ classId: cls.id, code: 'ก1', name: 'วิชา', sortOrder: 1 }).returning().get();
+		const me = await db.insert(students).values({ classId: cls.id, studentCode: 'me1', seatNo: 1 }).returning().get();
+		const you = await db.insert(students).values({ classId: cls.id, studentCode: 'you1', seatNo: 2 }).returning().get();
+		const hw = (date: string, due: string) => db.insert(entries).values({ classId: cls.id, entryDate: date, subjectId: sub.id, lesson: 'l', hasHomework: true, homeworkDetail: 'd', homeworkDue: due, authorDisplay: 'x' }).returning().get();
+		const e1 = await hw('2026-10-20', '2026-11-30');
+		const e2 = await hw('2026-10-21', '2026-12-01');
+		const say = (entryId: number, studentId: number, seatNo: number, hidden = false) => db.insert(comments).values({ entryId, studentId, seatNo, body: 'x', hidden }).returning().get();
+		const c1 = await say(e1.id, you.id, 2);
+		const c2 = await say(e1.id, me.id, 1); // my own
+		const c3 = await say(e1.id, you.id, 2);
+		await say(e1.id, you.id, 2, true); // hidden: never counted
+		const c4 = await say(e2.id, you.id, 2);
+		await db.insert(commentReads).values([{ studentId: me.id, entryId: e1.id, lastCommentId: c1.id }, { studentId: me.id, entryId: 0, lastCommentId: 3 }]);
+
+		const bundle = await loadRoomBundle(db, 'unread', null, me.id);
+		const mine = await loadMain(db, bundle!.room, { date: '2026-10-20' }, '2026-10-25', { admin: false, studentId: me.id });
+		const rows = new Map(mine.upcoming.map((r) => [r.id, r.cids]));
+		expect(rows.get(e1.id)).toEqual([c1.id, c3.id]); // c2 is mine, the hidden one is gone
+		expect(rows.get(e2.id)).toEqual([c4.id]);
+		expect(mine.cards[0].comments.map((c) => [c.id, c.mine])).toEqual([[c1.id, false], [c2.id, true], [c3.id, false]]);
+		expect(mine.newest).toBe(c4.id);
+		expect(mine.reads.map((r) => [r.entryId, r.last]).sort()).toEqual([[0, 3], [e1.id, c1.id]].sort());
+
+		// a visitor without an รหัส: nothing is "mine", no read marks
+		const anon = await loadMain(db, bundle!.room, { date: '2026-10-20' }, '2026-10-25', { admin: false, studentId: null });
+		expect(anon.upcoming.find((r) => r.id === e1.id)?.cids).toEqual([c1.id, c2.id, c3.id]);
+		expect(anon.reads).toEqual([]);
+		expect(anon.cards[0].comments.every((c) => !c.mine)).toBe(true);
+		// the lazily loaded card agrees
+		expect((await loadCard(db, bundle!.room, e1.id, { admin: false, studentId: me.id }))?.comments.map((c) => c.mine)).toEqual([false, true, false]);
 	}, 60_000);
 });

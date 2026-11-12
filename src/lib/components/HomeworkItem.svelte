@@ -3,6 +3,8 @@
 	import { fmtDate } from '#lib/dates.js';
 	import type { CardView, HomeworkRow } from '#lib/types.js';
 	import type { Marks } from '#lib/marks.svelte.js';
+	import type { Reads } from '#lib/reads.svelte.js';
+	import BubbleIcon from './BubbleIcon.svelte';
 	import EntryCard from './EntryCard.svelte';
 	import MarkButton from './MarkButton.svelte';
 	import Linkified from './Linkified.svelte';
@@ -18,10 +20,12 @@
 		onedit: (card: CardView) => void;
 		onzoom: (src: string) => void;
 		marks: Marks;
+		/** passed only for the current term */
+		reads?: Reads;
 		/** Changes whenever the page data is reloaded (after a comment, hide, …), so an open card refreshes itself. */
 		version: unknown;
 	}
-	let { row, base, chip, today, isAdmin, student, onedit, onzoom, marks, version }: Props = $props();
+	let { row, base, chip, today, isAdmin, student, onedit, onzoom, marks, reads, version }: Props = $props();
 
 	let open = $state(false);
 	let card = $state<CardView | null>(null);
@@ -50,6 +54,7 @@
 		toggle();
 	}
 	const done = $derived(marks.has(row.id));
+	const fresh = $derived(reads ? reads.unread(row.id, row.cids).length : 0);
 	function onItemKey(ev: KeyboardEvent) {
 		if (ev.target !== ev.currentTarget) return;
 		if (ev.key === 'Enter' || ev.key === ' ') {
@@ -73,7 +78,7 @@
 	<div class="itemx">
 		<button type="button" class="linkbtn collapse" aria-expanded="true" onclick={toggle}>▾ ย่อการ์ดนี้</button>
 		{#if card}
-			<EntryCard {card} {today} {isAdmin} {student} {onedit} {onzoom} mark={{ done, toggle: () => marks.toggle(row.id) }} />
+			<EntryCard {card} {today} {isAdmin} {student} {onedit} {onzoom} mark={{ done, toggle: () => marks.toggle(row.id) }} {reads} />
 			<button type="button" class="linkbtn collapse" onclick={toggle}>▾ ย่อการ์ดนี้</button>
 		{:else if loading}
 			<div class="empty">กำลังโหลด…</div>
@@ -88,6 +93,7 @@
 				<b>{row.subjectCode} {row.subjectName}</b>
 				<p><Linkified text={row.detail} /></p>
 				<span class="byline">ส่ง {fmtDate(row.due)}</span>
+				{#if fresh > 0}<span class="pillnew"><BubbleIcon size={16} />ใหม่ {fresh}</span>{/if}
 			</div>
 			<span class="chip" class:due={!chip.late} class:late={chip.late}>{chip.text}</span>
 		</div>

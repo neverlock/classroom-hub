@@ -187,3 +187,19 @@ export const homeworkMarks = sqliteTable(
 	},
 	(t) => [primaryKey({ columns: [t.studentId, t.entryId] }), index('homework_marks_entry_idx').on(t.entryId)]
 );
+
+/**
+ * How far a student (identified by รหัส) has read the comments of each card: the highest comment id seen.
+ * `entry_id = 0` holds the baseline, so comments that existed before the student's first visit are not "new".
+ * No foreign key on entry_id for that reason; deleting an entry removes its rows by hand.
+ */
+export const commentReads = sqliteTable(
+	'comment_reads',
+	{
+		studentId: integer('student_id').notNull().references(() => students.id),
+		entryId: integer('entry_id').notNull(),
+		lastCommentId: integer('last_comment_id').notNull(),
+		updatedAt: integer('updated_at').notNull().default(now)
+	},
+	(t) => [primaryKey({ columns: [t.studentId, t.entryId] })]
+);

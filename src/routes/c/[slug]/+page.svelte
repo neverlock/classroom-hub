@@ -5,6 +5,7 @@
 	import { goto } from '$app/navigation';
 	import { untrack } from 'svelte';
 	import { Marks } from '#lib/marks.svelte.js';
+	import { Reads } from '#lib/reads.svelte.js';
 	import { clampDate, fmtDate, groupByMonth, relDue, weekdayTh } from '#lib/dates.js';
 	import type { CardView } from '#lib/types.js';
 	import EntryCard from '#lib/components/EntryCard.svelte';
@@ -30,6 +31,26 @@
 		const ids = data.doneIds;
 		untrack(() => marks.sync(isStudent, ids));
 	});
+	const reads = new Reads(untrack(() => data.slug));
+	$effect(() => {
+		const isStudent = !!data.student;
+		const rows = data.reads;
+		const newest = data.newest;
+		untrack(() => reads.sync(isStudent, rows, newest));
+	});
+	/** read state only matters on the current term; old terms are a read-only archive */
+	const liveReads = $derived(data.view?.isCurrent ? reads : undefined);
+	/** every card and homework row on the page: comments by others, and the highest comment id (for "mark all read") */
+	const commentMap = $derived.by(() => {
+		const m = new Map<number, { others: number[]; top: number }>();
+		for (const c of data.cards) m.set(c.id, { others: c.comments.filter((x) => !x.mine).map((x) => x.id), top: c.comments.reduce((a, x) => Math.max(a, x.id), 0) });
+		for (const r of [...data.upcoming, ...data.overdue]) if (!m.has(r.id)) m.set(r.id, { others: r.cids, top: r.cids.reduce((a, x) => Math.max(a, x), 0) });
+		return m;
+	});
+	const newTotal = $derived(liveReads ? [...commentMap].reduce((a, [id, v]) => a + reads.unread(id, v.others).length, 0) : 0);
+	function readAll() {
+		reads.markRead(Object.fromEntries([...commentMap].filter(([, v]) => v.top > 0).map(([id, v]) => [id, v.top])));
+	}
 	const doneCount = $derived(data.upcoming.filter((r) => marks.has(r.id)).length);
 	const shownUpcoming = $derived(data.upcoming.filter((r) => filter === 'all' || (filter === 'done') === marks.has(r.id)));
 	const overdueOpen = $derived(data.overdue.filter((r) => !marks.has(r.id)).length);
@@ -161,10 +182,17 @@
 			</div>
 		{/if}
 
+		{#if newTotal > 0}
+			<div class="newbar" role="status">
+				<span><b>{newTotal}</b> ความคิดเห็นใหม่ ที่ยังไม่ได้อ่าน</span>
+				<button type="button" class="linkbtn" onclick={readAll}>ทำเครื่องหมายว่าอ่านแล้วทั้งหมด</button>
+			</div>
+		{/if}
+
 		<h2 class="sec">📚 สิ่งที่เรียน (ตามวันที่เลือก)</h2>
 		<div class="grid">
 			{#each data.cards as card (card.id)}
-				<EntryCard {card} today={data.today} isAdmin={isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} />
+				<EntryCard {card} today={data.today} isAdmin={isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} reads={liveReads} />
 			{:else}
 				<div class="empty" style="grid-column: 1 / -1">ยังไม่มีบันทึกของวันที่ {fmtDate(data.date)}</div>
 			{/each}
@@ -186,7 +214,7 @@
 			{/if}
 			<div class="list">
 				{#each shownUpcoming as r (r.id)}
-					<HomeworkItem row={r} {base} chip={{ text: relDue(r.due, data.today), late: false }} today={data.today} {isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} {marks} version={data} />
+					<HomeworkItem row={r} {base} chip={{ text: relDue(r.due, data.today), late: false }} today={data.today} {isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} {marks} reads={liveReads} version={data} />
 				{:else}
 					<div class="empty">{data.upcoming.length === 0 || filter === 'todo' ? '🎉 ยอดเยี่ยมมาก! ไม่มีการบ้านค้างเลยครับ' : 'ยังไม่มีงานที่ทำแล้ว'}</div>
 				{/each}
@@ -203,7 +231,7 @@
 						<div class="month"><span>{g.label}</span><span>{g.items.length} งาน</span></div>
 						<div class="list">
 							{#each g.items as r (r.id)}
-								<HomeworkItem row={r} {base} chip={{ text: relDue(r.due, data.today), late: true }} today={data.today} {isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} {marks} version={data} />
+								<HomeworkItem row={r} {base} chip={{ text: relDue(r.due, data.today), late: true }} today={data.today} {isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} {marks} reads={liveReads} version={data} />
 							{/each}
 						</div>
 					{/each}
