@@ -22,6 +22,7 @@
 	let zoom = $state<string | null>(null);
 	let overMonths = $state(3);
 	let loginBusy = $state(false);
+	let loginOpen = $state(false);
 	let filter = $state<'all' | 'todo' | 'done'>('all');
 
 	// "ทำแล้ว" marks: on the server for a student who entered their รหัส, in this browser otherwise
@@ -70,8 +71,20 @@
 		if (!data.view) return;
 		goto(href({ term: data.view.id, d: clampDate(d, data.view.startDate, data.view.endDate) }), { reset: false });
 	}
+	// signing in succeeded: the login panel has done its job
+	$effect(() => {
+		if (data.actor) loginOpen = false;
+	});
+	function toggleLogin() {
+		loginOpen = !loginOpen;
+		if (loginOpen) {
+			panelOpen = false;
+			queueMicrotask(() => document.getElementById('idname')?.focus());
+		}
+	}
 	function openPanel() {
 		panelOpen = !panelOpen;
+		if (panelOpen) loginOpen = false;
 		if (panelOpen && !formDate) formDate = data.currentTerm ? clampDate(data.today, data.currentTerm.startDate, data.currentTerm.endDate) : data.today;
 	}
 	function edit(card: CardView) {
@@ -99,7 +112,46 @@
 	{/if}
 
 	{#if data.open}
-		<button class="cta" id="toggle" type="button" aria-expanded={panelOpen} aria-controls="panel" onclick={openPanel}>+ บันทึกสิ่งที่เรียน / การบ้านใหม่</button>
+		<div class="actions">
+			<button class="cta" id="toggle" type="button" aria-expanded={panelOpen} aria-controls="panel" onclick={openPanel}>+ บันทึกสิ่งที่เรียน / การบ้านใหม่</button>
+			{#if data.actor}
+				<form method="POST" action={actionUrl(page.url, 'logout')} use:enhance style="display: contents">
+					<button class="authbtn" type="submit" aria-label="ออกจากระบบแอดมิน">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>Logout
+					</button>
+				</form>
+			{:else}
+				<button class="authbtn" id="loginToggle" type="button" aria-expanded={loginOpen} aria-controls="loginPanel" aria-label="ล็อกอินแอดมินห้อง" onclick={toggleLogin}>
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>Login
+				</button>
+			{/if}
+		</div>
+		{#if data.actor}<p class="whoami">👤 ล็อกอินเป็น <b>{data.actor.display}</b> (แอดมินห้อง)</p>{/if}
+		{#if loginOpen && !data.actor}
+			<section class="panel detached" id="loginPanel" aria-label="ล็อกอินแอดมินห้อง">
+				<h2 class="ptitle">ล็อกอินแอดมินห้อง</h2>
+				<p class="hint">แอดมินแก้ไข/ซ่อนการ์ดและความคิดเห็นของทุกคนได้ · นักเรียนไม่ต้องล็อกอิน ใช้ "รหัส" ตอนบันทึกหรือเขียนความคิดเห็น</p>
+				<form
+					method="POST"
+					action={actionUrl(page.url, 'login')}
+					use:enhance={() => {
+						loginBusy = true;
+						return async ({ update }) => {
+							loginBusy = false;
+							await update({ reset: false });
+						};
+					}}
+				>
+					<label for="idname">ชื่อผู้ใช้ (user name)</label>
+					<input type="text" id="idname" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="เช่น mai" />
+					<label for="idpin">รหัสผ่าน</label>
+					<input type="password" id="idpin" name="password" autocomplete="current-password" />
+					<p class="hint">ลืมรหัสผ่านให้ติดต่อผู้ดูแลระบบ</p>
+					{#if loginError}<p class="err" role="alert">{loginError}</p>{/if}
+					<button class="btn" type="submit" disabled={loginBusy}>{loginBusy ? 'กำลังตรวจสอบ…' : 'Login'}</button>
+				</form>
+			</section>
+		{/if}
 		{#if panelOpen}
 			<section class="panel" id="panel">
 				<EntryForm
@@ -113,33 +165,8 @@
 				<div class="tools" style="margin-top: 14px">
 					{#if data.actor}
 						<a class="sbtn" style="text-decoration: none; display: grid; place-items: center" href={`${base}/manage`}>⚙ จัดการห้อง</a>
-						<form method="POST" action={actionUrl(page.url, 'logout')} use:enhance style="display: contents"><button class="sbtn" type="submit">ออกจากระบบแอดมิน</button></form>
 					{/if}
 				</div>
-				{#if !data.actor}
-					<details class="adminlogin">
-						<summary>แอดมินห้อง? ล็อกอินที่นี่</summary>
-						<form
-							method="POST"
-							action={actionUrl(page.url, 'login')}
-							use:enhance={() => {
-								loginBusy = true;
-								return async ({ update }) => {
-									loginBusy = false;
-									await update({ reset: false });
-								};
-							}}
-						>
-							<label for="idname">ชื่อผู้ใช้ (user name)</label>
-							<input type="text" id="idname" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="เช่น mai" />
-							<label for="idpin">รหัสผ่าน</label>
-							<input type="password" id="idpin" name="password" autocomplete="current-password" />
-							<p class="hint">แอดมินแก้ไข/ซ่อนการ์ดและความคิดเห็นของทุกคนได้ · ลืมรหัสผ่านให้ติดต่อผู้ดูแลระบบ</p>
-							{#if loginError}<p class="err" role="alert">{loginError}</p>{/if}
-							<button class="btn" type="submit" disabled={loginBusy}>{loginBusy ? 'กำลังตรวจสอบ…' : 'ล็อกอินแอดมิน'}</button>
-						</form>
-					</details>
-				{/if}
 			</section>
 		{/if}
 	{/if}
