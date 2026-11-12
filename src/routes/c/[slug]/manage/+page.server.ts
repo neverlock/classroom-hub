@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
-import { attachments, classAdmins, classes, comments, entries, homeworkMarks, students, subjects, terms } from '#lib/server/db/schema.js';
+import { attachments, classAdmins, classes, commentReads, comments, entries, homeworkMarks, students, subjects, terms } from '#lib/server/db/schema.js';
 import { adminContext, forgetStudentAction, loginAction, logoutAction, roomContext } from '#lib/server/room.js';
 import { loadManageData, loadSubjects } from '#lib/server/queries.js';
 import { batch } from '#lib/server/env.js';
@@ -241,6 +241,7 @@ export const actions: Actions = {
 			db.delete(attachments).where(eq(attachments.entryId, id)),
 			db.delete(comments).where(eq(comments.entryId, id)),
 			db.delete(homeworkMarks).where(eq(homeworkMarks.entryId, id)),
+			db.delete(commentReads).where(eq(commentReads.entryId, id)),
 			db.delete(entries).where(and(eq(entries.id, id), eq(entries.classId, room.cls.id)))
 		]);
 		return ok({ purged: 'entry' as const, comments: nComments[0]?.n ?? 0, photos: keys.length });

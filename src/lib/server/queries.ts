@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, getTableColumns, gte, lt, max, sql, type SQL } from 'drizzle-orm';
 import { addDays, isIsoDate } from '#lib/dates.js';
-import { attachments, classAdmins, classes, comments, entries, gpaCourses, gpaSubjects, homeworkMarks, students, subjects, terms } from './db/schema';
+import { attachments, classAdmins, classes, commentReads, comments, entries, gpaCourses, gpaSubjects, homeworkMarks, students, subjects, terms } from './db/schema';
 import type { CardView, HomeworkRow } from '#lib/types.js';
 import { batch, type Db } from './env';
 
@@ -75,7 +75,7 @@ function entryPhotos(db: Db, where: SQL | undefined) {
 
 function entryComments(db: Db, where: SQL | undefined) {
 	return db
-		.select({ id: comments.id, entryId: comments.entryId, seatNo: comments.seatNo, body: comments.body, createdAt: comments.createdAt })
+		.select({ id: comments.id, entryId: comments.entryId, studentId: comments.studentId, seatNo: comments.seatNo, body: comments.body, createdAt: comments.createdAt })
 		.from(comments)
 		.innerJoin(entries, eq(comments.entryId, entries.id))
 		.where(and(where, eq(comments.hidden, false)))
@@ -93,7 +93,7 @@ function commentPhotos(db: Db, where: SQL | undefined) {
 }
 
 type PhotoRows = { id: number; entryId: number }[];
-type CommentRows = { id: number; entryId: number; seatNo: number; body: string; createdAt: number }[];
+type CommentRows = { id: number; entryId: number; studentId: number; seatNo: number; body: string; createdAt: number }[];
 type CommentPhotoRows = { id: number; commentId: number }[];
 
 function buildCards(
@@ -101,7 +101,7 @@ function buildCards(
 	pics: PhotoRows,
 	cs: CommentRows,
 	cPics: CommentPhotoRows,
-	opts: { date: string | ((r: CardRow) => string); canEdit: (r: CardRow) => boolean }
+	opts: { date: string | ((r: CardRow) => string); canEdit: (r: CardRow) => boolean; viewerStudentId: number | null }
 ): CardView[] {
 	const photosByEntry = new Map<number, number[]>();
 	for (const p of pics) photosByEntry.set(p.entryId, [...(photosByEntry.get(p.entryId) ?? []), p.id]);
@@ -110,7 +110,7 @@ function buildCards(
 	const commentsByEntry = new Map<number, CardView['comments']>();
 	for (const c of cs) {
 		const list = commentsByEntry.get(c.entryId) ?? [];
-		list.push({ id: c.id, seatNo: c.seatNo, body: c.body, createdAt: c.createdAt, photos: photosByComment.get(c.id) ?? [] });
+		list.push({ id: c.id, seatNo: c.seatNo, body: c.body, createdAt: c.createdAt, photos: photosByComment.get(c.id) ?? [], mine: opts.viewerStudentId !== null && c.studentId === opts.viewerStudentId });
 		commentsByEntry.set(c.entryId, list);
 	}
 	return rows.map((r) => ({
@@ -137,6 +137,30 @@ export function doneMarks(db: Db, classId: number, studentId: number | null) {
 		.where(and(eq(entries.classId, classId), eq(homeworkMarks.studentId, studentId ?? -1)));
 }
 
+/** How far this student has read each card (entry_id 0 = the baseline). Visitors without an รหัส (null) match nothing. */
+export function readRows(db: Db, studentId: number | null) {
+	return db.select({ entryId: commentReads.entryId, last: commentReads.lastCommentId }).from(commentReads).where(eq(commentReads.studentId, studentId ?? -1));
+}
+
+/** Visible comments of homework cards in a date range: only ids, to count what is new without loading the cards. */
+function homeworkCommentIds(db: Db, classId: number, from: string, to: string) {
+	return db
+		.select({ id: comments.id, entryId: comments.entryId, studentId: comments.studentId })
+		.from(comments)
+		.innerJoin(entries, eq(comments.entryId, entries.id))
+		.where(and(eq(entries.classId, classId), eq(entries.hidden, false), eq(entries.hasHomework, true), eq(comments.hidden, false), gte(entries.entryDate, from), lt(entries.entryDate, to)))
+		.orderBy(asc(comments.id));
+}
+
+/** Highest visible comment id in the room: the baseline for a reader's first visit. */
+function newestComment(db: Db, classId: number) {
+	return db
+		.select({ n: sql<number>`coalesce(max(${comments.id}), 0)`.as('newest') })
+		.from(comments)
+		.innerJoin(entries, eq(comments.entryId, entries.id))
+		.where(and(eq(entries.classId, classId), eq(entries.hidden, false), eq(comments.hidden, false)));
+}
+
 export async function loadMain(
 	db: Db,
 	room: Room,
@@ -147,7 +171,7 @@ export async function loadMain(
 	const { cls } = room;
 	const termId = Number(params.term);
 	const view = room.terms.find((t) => t.id === termId) ?? room.current ?? room.terms[0] ?? null;
-	if (!view) return { view: null, date: today, cards: [] as CardView[], upcoming: [] as HomeworkRow[], overdue: [] as HomeworkRow[], doneIds: [] as number[], subjects: [] as (typeof subjects.$inferSelect)[] };
+	if (!view) return { view: null, date: today, cards: [] as CardView[], upcoming: [] as HomeworkRow[], overdue: [] as HomeworkRow[], doneIds: [] as number[], reads: [] as { entryId: number; last: number }[], newest: 0, subjects: [] as (typeof subjects.$inferSelect)[] };
 	const isCurrent = view.id === room.current?.id;
 
 	let date: string;
@@ -165,7 +189,7 @@ export async function loadMain(
 	// Everything the page needs for this date, in ONE round trip. Photos and comments are looked up by
 	// (class, date) through joins, so they do not have to wait for the list of cards.
 	const dayOf = and(eq(entries.classId, cls.id), eq(entries.entryDate, date), eq(entries.hidden, false));
-	const [rows, hwRows, pics, cs, cPics, subs, marks] = (await batch(db, [
+	const [rows, hwRows, pics, cs, cPics, subs, marks, readList, hwCs, newest] = (await batch(db, [
 		cardRows(db, dayOf),
 		db
 			.select({ id: entries.id, code: subjects.code, name: subjects.name, detail: entries.homeworkDetail, due: entries.homeworkDue })
@@ -185,7 +209,10 @@ export async function loadMain(
 		entryComments(db, dayOf),
 		commentPhotos(db, dayOf),
 		db.select().from(subjects).where(eq(subjects.classId, cls.id)).orderBy(asc(subjects.sortOrder), asc(subjects.id)),
-		doneMarks(db, cls.id, viewer.studentId)
+		doneMarks(db, cls.id, viewer.studentId),
+		readRows(db, viewer.studentId),
+		homeworkCommentIds(db, cls.id, view.startDate, addDays(view.endDate, 1)),
+		newestComment(db, cls.id)
 	])) as [
 		CardRow[],
 		{ id: number; code: string; name: string; detail: string | null; due: string | null }[],
@@ -193,19 +220,26 @@ export async function loadMain(
 		CommentRows,
 		CommentPhotoRows,
 		(typeof subjects.$inferSelect)[],
-		{ entryId: number }[]
+		{ entryId: number }[],
+		{ entryId: number; last: number }[],
+		{ id: number; entryId: number; studentId: number }[],
+		{ n: number }[]
 	];
 
 	const cards = buildCards(rows, pics, cs, cPics, {
 		date,
-		canEdit: (r) => isCurrent && room.cls.active && (viewer.admin || (viewer.studentId !== null && r.authorStudentId === viewer.studentId))
+		canEdit: (r) => isCurrent && room.cls.active && (viewer.admin || (viewer.studentId !== null && r.authorStudentId === viewer.studentId)),
+		viewerStudentId: viewer.studentId
 	});
 
-	const toRow = (r: (typeof hwRows)[number]): HomeworkRow => ({ id: r.id, subjectCode: r.code, subjectName: r.name, detail: r.detail ?? '', due: r.due ?? '' });
+	const others = new Map<number, number[]>();
+	for (const c of hwCs) if (c.studentId !== viewer.studentId) others.set(c.entryId, [...(others.get(c.entryId) ?? []), c.id]);
+
+	const toRow = (r: (typeof hwRows)[number]): HomeworkRow => ({ id: r.id, subjectCode: r.code, subjectName: r.name, detail: r.detail ?? '', due: r.due ?? '', cids: others.get(r.id) ?? [] });
 	const upcoming = isCurrent ? hwRows.filter((r) => (r.due ?? '') >= today).map(toRow) : [];
 	const overdue = hwRows.filter((r) => (r.due ?? '') < today).map(toRow).reverse();
 
-	return { view, date, cards, upcoming, overdue, doneIds: marks.map((m) => m.entryId), subjects: subs };
+	return { view, date, cards, upcoming, overdue, doneIds: marks.map((m) => m.entryId), reads: readList, newest: newest[0]?.n ?? 0, subjects: subs };
 }
 
 /**
@@ -222,7 +256,8 @@ export async function loadCard(db: Db, room: Room, entryId: number, viewer: View
 	return (
 		buildCards(rows, pics, cs, cPics, {
 			date,
-			canEdit: (r) => isCurrent && room.cls.active && (viewer.admin || (viewer.studentId !== null && r.authorStudentId === viewer.studentId))
+			canEdit: (r) => isCurrent && room.cls.active && (viewer.admin || (viewer.studentId !== null && r.authorStudentId === viewer.studentId)),
+			viewerStudentId: viewer.studentId
 		})[0] ?? null
 	);
 }

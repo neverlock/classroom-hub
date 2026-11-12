@@ -6,6 +6,8 @@
 	import type { CardView } from '#lib/types.js';
 	import CommentForm from './CommentForm.svelte';
 	import Linkified from './Linkified.svelte';
+	import type { Reads } from '#lib/reads.svelte.js';
+	import BubbleIcon from './BubbleIcon.svelte';
 	import MarkButton from './MarkButton.svelte';
 
 	interface Props {
@@ -18,10 +20,23 @@
 		onzoom: (src: string) => void;
 		/** "ทำแล้ว" toggle, passed only where the card is opened from the homework lists */
 		mark?: { done: boolean; toggle: () => void };
+		/** read state, passed only for the current term (old terms show no "new" badges) */
+		reads?: Reads;
 	}
-	let { card, today, isAdmin, student, onedit, onzoom, mark }: Props = $props();
+	let { card, today, isAdmin, student, onedit, onzoom, mark, reads }: Props = $props();
 
 	let open = $state(false);
+	// comments by others the reader has not seen; while the card is open they keep a "ใหม่" tag until it is closed
+	const newIds = $derived(reads ? reads.unread(card.id, card.comments.filter((c) => !c.mine).map((c) => c.id)) : []);
+	const showNew = $derived(!open && newIds.length > 0);
+	let seen = $state<Set<number>>(new Set());
+	function toggleComments() {
+		if (!open) seen = new Set(newIds);
+		else seen = new Set();
+		open = !open;
+		const top = card.comments.reduce((m, c) => Math.max(m, c.id), 0);
+		if (reads && top > 0) reads.markRead({ [card.id]: top });
+	}
 	let sureCard = $state(false);
 	let sureComment = $state<number | null>(null);
 	function confirmOnce(ev: Event, current: boolean, set: (v: boolean) => void) {
@@ -73,15 +88,19 @@
 			</div>
 		{/if}
 	</div>
-	<button class="cbtn" type="button" aria-expanded={open} onclick={() => (open = !open)}>
-		💬 {card.comments.length} <span>ความคิดเห็น</span><i>{open ? '▾ ย่อ' : '▸ อ่าน / เขียน'}</i>
+	<button class="cbtn" class:unread={showNew} type="button" aria-expanded={open} onclick={toggleComments}>
+		{#if showNew}
+			<BubbleIcon count={newIds.length} /><strong class="newtxt">ความคิดเห็นใหม่ {newIds.length}</strong><i>▸ อ่าน / เขียน</i>
+		{:else}
+			💬 {card.comments.length} <span>ความคิดเห็น</span><i>{open ? '▾ ย่อ' : '▸ อ่าน / เขียน'}</i>
+		{/if}
 	</button>
 	{#if open}
 		<div class="cmts">
 			{#each card.comments as c (c.id)}
-				<div class="cm">
+				<div class="cm" class:new={seen.has(c.id)}>
 					<header>
-						<span><b>เลขที่ {c.seatNo}</b> · {fmtDateTime(c.createdAt, today)}</span>
+						<span><b>เลขที่ {c.seatNo}</b> · {fmtDateTime(c.createdAt, today)}{#if seen.has(c.id)} <span class="newtag">ใหม่</span>{/if}</span>
 						{#if isAdmin}
 							<form method="POST" action={actionUrl(page.url, 'hideComment')} use:enhance>
 								<input type="hidden" name="id" value={c.id} />

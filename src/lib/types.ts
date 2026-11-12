@@ -5,6 +5,8 @@ export interface CommentView {
 	body: string;
 	createdAt: number;
 	photos: number[];
+	/** written by the identified viewer: never counts as "new" for them */
+	mine: boolean;
 }
 
 export interface CardView {
@@ -28,4 +30,6 @@ export interface HomeworkRow {
 	subjectName: string;
 	detail: string;
 	due: string;
+	/** ids of the visible comments written by other people (own ones excluded), to work out what is new */
+	cids: number[];
 }
