@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /** Dates are ISO `YYYY-MM-DD` text; timestamps are unix milliseconds. */
 const now = sql`(unixepoch() * 1000)`;
@@ -175,4 +175,15 @@ export const gpaSubjects = sqliteTable(
 		sortOrder: integer('sort_order').notNull().default(0)
 	},
 	(t) => [index('gpa_subjects_course_idx').on(t.courseId, t.termNo, t.sortOrder)]
+);
+
+/** "ทำแล้ว" marks of students who have entered their รหัส. Visitors without one keep the mark in their browser instead. */
+export const homeworkMarks = sqliteTable(
+	'homework_marks',
+	{
+		studentId: integer('student_id').notNull().references(() => students.id),
+		entryId: integer('entry_id').notNull().references(() => entries.id),
+		createdAt: integer('created_at').notNull().default(now)
+	},
+	(t) => [primaryKey({ columns: [t.studentId, t.entryId] }), index('homework_marks_entry_idx').on(t.entryId)]
 );

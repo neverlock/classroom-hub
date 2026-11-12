@@ -3,8 +3,8 @@ import { getPlatformProxy } from 'wrangler';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getDb } from './db';
-import { attachments, classAdmins, classes, comments, entries, gpaCourses, gpaSubjects, students, subjects, terms } from './db/schema';
-import { loadAdminOverview, loadCard, loadGpaCourse, loadGpaCourses, loadMain, loadManageData, loadRoomBundle } from './queries';
+import { attachments, classAdmins, classes, comments, entries, gpaCourses, gpaSubjects, homeworkMarks, students, subjects, terms } from './db/schema';
+import { doneMarks, loadAdminOverview, loadCard, loadGpaCourse, loadGpaCourses, loadMain, loadManageData, loadRoomBundle } from './queries';
 
 /**
  * Runs the real queries against a real (in-memory) D1 from wrangler's local runtime.
@@ -173,5 +173,37 @@ describe('GPA course queries against D1', () => {
 		expect(one?.subjects.map((s) => [s.termNo, s.id])).toEqual([[0, sci.id], [0, math.id], [1, eng.id]]);
 		expect(one?.subjects.every((s) => s.courseId === iep.id)).toBe(true);
 		expect(await loadGpaCourse(db, 'nope')).toBeNull();
+	}, 60_000);
+});
+
+describe('homework "ทำแล้ว" marks against D1', () => {
+	it('returns only the marks of that student, in that class', async () => {
+		const mk = async (slug: string) => {
+			const cls = await db.insert(classes).values({ slug }).returning().get();
+			const term = await db.insert(terms).values({ classId: cls.id, name: 't', classLabel: 'x', startDate: '2026-08-01', endDate: '2027-03-31' }).returning().get();
+			await db.update(classes).set({ currentTermId: term.id }).where(eq(classes.id, cls.id));
+			const sub = await db.insert(subjects).values({ classId: cls.id, code: 'ก1', name: 'วิชา', sortOrder: 1 }).returning().get();
+			const a = await db.insert(students).values({ classId: cls.id, studentCode: 'aaa' + slug, seatNo: 1 }).returning().get();
+			const b = await db.insert(students).values({ classId: cls.id, studentCode: 'bbb' + slug, seatNo: 2 }).returning().get();
+			const hw = (date: string, due: string) => db.insert(entries).values({ classId: cls.id, entryDate: date, subjectId: sub.id, lesson: 'l', hasHomework: true, homeworkDetail: 'd', homeworkDue: due, authorDisplay: 'x' }).returning().get();
+			return { cls, a, b, e1: await hw('2026-10-20', '2026-10-30'), e2: await hw('2026-10-21', '2026-11-01'), e3: await hw('2026-10-22', '2026-11-02') };
+		};
+		const r1 = await mk('mk1');
+		const r2 = await mk('mk2');
+		await db.insert(homeworkMarks).values([{ studentId: r1.a.id, entryId: r1.e1.id }, { studentId: r1.a.id, entryId: r1.e3.id }, { studentId: r1.b.id, entryId: r1.e2.id }, { studentId: r2.a.id, entryId: r2.e1.id }]);
+
+		expect((await doneMarks(db, r1.cls.id, r1.a.id)).map((m) => m.entryId).sort()).toEqual([r1.e1.id, r1.e3.id].sort());
+		expect((await doneMarks(db, r1.cls.id, r1.b.id)).map((m) => m.entryId)).toEqual([r1.e2.id]);
+		expect(await doneMarks(db, r1.cls.id, null)).toEqual([]);
+		// a mark never crosses into another class
+		expect(await doneMarks(db, r2.cls.id, r1.a.id)).toEqual([]);
+
+		const bundle = await loadRoomBundle(db, 'mk1', null, r1.a.id);
+		const main = await loadMain(db, bundle!.room, { date: '2026-10-25' }, '2026-10-25', { admin: false, studentId: r1.a.id });
+		expect(main.doneIds.sort()).toEqual([r1.e1.id, r1.e3.id].sort());
+		const anon = await loadMain(db, bundle!.room, { date: '2026-10-25' }, '2026-10-25', { admin: false, studentId: null });
+		expect(anon.doneIds).toEqual([]);
+		// one mark per student per entry
+		await expect(db.insert(homeworkMarks).values({ studentId: r1.a.id, entryId: r1.e1.id })).rejects.toThrow();
 	}, 60_000);
 });

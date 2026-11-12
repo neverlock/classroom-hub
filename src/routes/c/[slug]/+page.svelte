@@ -3,6 +3,8 @@
 	import { actionUrl } from '#lib/action-url.js';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
+	import { untrack } from 'svelte';
+	import { Marks } from '#lib/marks.svelte.js';
 	import { clampDate, fmtDate, groupByMonth, relDue, weekdayTh } from '#lib/dates.js';
 	import type { CardView } from '#lib/types.js';
 	import EntryCard from '#lib/components/EntryCard.svelte';
@@ -19,6 +21,18 @@
 	let zoom = $state<string | null>(null);
 	let overMonths = $state(3);
 	let loginBusy = $state(false);
+	let filter = $state<'all' | 'todo' | 'done'>('all');
+
+	// "ทำแล้ว" marks: on the server for a student who entered their รหัส, in this browser otherwise
+	const marks = new Marks(untrack(() => data.slug));
+	$effect(() => {
+		const isStudent = !!data.student;
+		const ids = data.doneIds;
+		untrack(() => marks.sync(isStudent, ids));
+	});
+	const doneCount = $derived(data.upcoming.filter((r) => marks.has(r.id)).length);
+	const shownUpcoming = $derived(data.upcoming.filter((r) => filter === 'all' || (filter === 'done') === marks.has(r.id)));
+	const overdueOpen = $derived(data.overdue.filter((r) => !marks.has(r.id)).length);
 
 	const base = $derived(`/c/${data.slug}`);
 	const isAdmin = $derived(!!data.actor && data.open && !!data.view?.isCurrent);
@@ -158,17 +172,29 @@
 
 		{#if data.view.isCurrent}
 			<h2 class="sec">📌 การบ้านที่ต้องส่ง (เรียงตามกำหนด)</h2>
+			{#if data.upcoming.length}
+				<div class="hw-prog" aria-live="polite">
+					<span>ทำแล้ว <b>{doneCount}</b> จาก <b>{data.upcoming.length}</b> งาน</span>
+					<span class="hint">{doneCount === data.upcoming.length ? '🎉 ครบแล้ว' : `เหลือ ${data.upcoming.length - doneCount} งาน`}</span>
+					<div class="hw-bar" role="img" aria-label="ความคืบหน้าการบ้าน"><i style={`width: ${(doneCount / data.upcoming.length) * 100}%`}></i></div>
+				</div>
+				<div class="hw-filter" role="group" aria-label="กรองรายการการบ้าน">
+					<button type="button" aria-pressed={filter === 'all'} onclick={() => (filter = 'all')}>ทั้งหมด<small>{data.upcoming.length}</small></button>
+					<button type="button" aria-pressed={filter === 'todo'} onclick={() => (filter = 'todo')}>ยังไม่ทำ<small>{data.upcoming.length - doneCount}</small></button>
+					<button type="button" aria-pressed={filter === 'done'} onclick={() => (filter = 'done')}>ทำแล้ว<small>{doneCount}</small></button>
+				</div>
+			{/if}
 			<div class="list">
-				{#each data.upcoming as r (r.id)}
-					<HomeworkItem row={r} {base} chip={{ text: relDue(r.due, data.today), late: false }} today={data.today} {isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} version={data} />
+				{#each shownUpcoming as r (r.id)}
+					<HomeworkItem row={r} {base} chip={{ text: relDue(r.due, data.today), late: false }} today={data.today} {isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} {marks} version={data} />
 				{:else}
-					<div class="empty">🎉 ยอดเยี่ยมมาก! ไม่มีการบ้านค้างเลยครับ</div>
+					<div class="empty">{data.upcoming.length === 0 || filter === 'todo' ? '🎉 ยอดเยี่ยมมาก! ไม่มีการบ้านค้างเลยครับ' : 'ยังไม่มีงานที่ทำแล้ว'}</div>
 				{/each}
 			</div>
 		{/if}
 
 		<details class="over">
-			<summary><span>⏰ งานเลยกำหนดส่ง ({data.overdue.length})</span></summary>
+			<summary><span>⏰ งานเลยกำหนดส่ง ({data.overdue.length}{overdueOpen < data.overdue.length ? ` · ค้าง ${overdueOpen}` : ''})</span></summary>
 			<div class="over-body">
 				{#if data.overdue.length === 0}
 					<div class="empty" style="margin-top: 4px">ไม่มีงานที่เลยกำหนด</div>
@@ -177,7 +203,7 @@
 						<div class="month"><span>{g.label}</span><span>{g.items.length} งาน</span></div>
 						<div class="list">
 							{#each g.items as r (r.id)}
-								<HomeworkItem row={r} {base} chip={{ text: relDue(r.due, data.today), late: true }} today={data.today} {isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} version={data} />
+								<HomeworkItem row={r} {base} chip={{ text: relDue(r.due, data.today), late: true }} today={data.today} {isAdmin} student={data.student} onedit={edit} onzoom={(src) => (zoom = src)} {marks} version={data} />
 							{/each}
 						</div>
 					{/each}

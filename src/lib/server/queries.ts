@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, getTableColumns, gte, lt, max, sql, type SQL } from 'drizzle-orm';
 import { addDays, isIsoDate } from '#lib/dates.js';
-import { attachments, classAdmins, classes, comments, entries, gpaCourses, gpaSubjects, students, subjects, terms } from './db/schema';
+import { attachments, classAdmins, classes, comments, entries, gpaCourses, gpaSubjects, homeworkMarks, students, subjects, terms } from './db/schema';
 import type { CardView, HomeworkRow } from '#lib/types.js';
 import { batch, type Db } from './env';
 
@@ -128,6 +128,15 @@ function buildCards(
 	}));
 }
 
+/** Entries of this class the student has marked done. Visitors without an รหัส (null) match nothing, so the query always runs inside the same batch. */
+export function doneMarks(db: Db, classId: number, studentId: number | null) {
+	return db
+		.select({ entryId: homeworkMarks.entryId })
+		.from(homeworkMarks)
+		.innerJoin(entries, eq(homeworkMarks.entryId, entries.id))
+		.where(and(eq(entries.classId, classId), eq(homeworkMarks.studentId, studentId ?? -1)));
+}
+
 export async function loadMain(
 	db: Db,
 	room: Room,
@@ -138,7 +147,7 @@ export async function loadMain(
 	const { cls } = room;
 	const termId = Number(params.term);
 	const view = room.terms.find((t) => t.id === termId) ?? room.current ?? room.terms[0] ?? null;
-	if (!view) return { view: null, date: today, cards: [] as CardView[], upcoming: [] as HomeworkRow[], overdue: [] as HomeworkRow[], subjects: [] as (typeof subjects.$inferSelect)[] };
+	if (!view) return { view: null, date: today, cards: [] as CardView[], upcoming: [] as HomeworkRow[], overdue: [] as HomeworkRow[], doneIds: [] as number[], subjects: [] as (typeof subjects.$inferSelect)[] };
 	const isCurrent = view.id === room.current?.id;
 
 	let date: string;
@@ -156,7 +165,7 @@ export async function loadMain(
 	// Everything the page needs for this date, in ONE round trip. Photos and comments are looked up by
 	// (class, date) through joins, so they do not have to wait for the list of cards.
 	const dayOf = and(eq(entries.classId, cls.id), eq(entries.entryDate, date), eq(entries.hidden, false));
-	const [rows, hwRows, pics, cs, cPics, subs] = (await batch(db, [
+	const [rows, hwRows, pics, cs, cPics, subs, marks] = (await batch(db, [
 		cardRows(db, dayOf),
 		db
 			.select({ id: entries.id, code: subjects.code, name: subjects.name, detail: entries.homeworkDetail, due: entries.homeworkDue })
@@ -175,14 +184,16 @@ export async function loadMain(
 		entryPhotos(db, dayOf),
 		entryComments(db, dayOf),
 		commentPhotos(db, dayOf),
-		db.select().from(subjects).where(eq(subjects.classId, cls.id)).orderBy(asc(subjects.sortOrder), asc(subjects.id))
+		db.select().from(subjects).where(eq(subjects.classId, cls.id)).orderBy(asc(subjects.sortOrder), asc(subjects.id)),
+		doneMarks(db, cls.id, viewer.studentId)
 	])) as [
 		CardRow[],
 		{ id: number; code: string; name: string; detail: string | null; due: string | null }[],
 		PhotoRows,
 		CommentRows,
 		CommentPhotoRows,
-		(typeof subjects.$inferSelect)[]
+		(typeof subjects.$inferSelect)[],
+		{ entryId: number }[]
 	];
 
 	const cards = buildCards(rows, pics, cs, cPics, {
@@ -194,7 +205,7 @@ export async function loadMain(
 	const upcoming = isCurrent ? hwRows.filter((r) => (r.due ?? '') >= today).map(toRow) : [];
 	const overdue = hwRows.filter((r) => (r.due ?? '') < today).map(toRow).reverse();
 
-	return { view, date, cards, upcoming, overdue, subjects: subs };
+	return { view, date, cards, upcoming, overdue, doneIds: marks.map((m) => m.entryId), subjects: subs };
 }
 
 /**
