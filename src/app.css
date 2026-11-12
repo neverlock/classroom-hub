@@ -164,9 +164,10 @@ input[type='file'] { width: 100%; max-width: 100%; min-width: 0; font-size: 14px
 .hw-foot { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; border-top: 1px dashed var(--line); padding-top: 8px; }
 .hw-more { background: none; border: 0; color: var(--muted); font-weight: 700; font-size: 13px; cursor: pointer; min-height: 44px; padding: 0 4px; }
 .hw-mark { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 8px; border-radius: 99px; border: 2px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 700; font-size: 15px; }
-.hw-mark .box { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--muted); display: grid; place-items: center; font-size: 15px; line-height: 1; color: transparent; }
+.hw-tick { box-sizing: border-box; width: 26px; height: 26px; flex: none; border-radius: 50%; border: 2px solid var(--muted); display: grid; place-items: center; color: transparent; }
+.hw-tick svg { width: 16px; height: 16px; display: block; }
 .hw-mark[aria-pressed='true'] { background: var(--good); border-color: var(--good); color: #fff; }
-.hw-mark[aria-pressed='true'] .box { background: #fff; border-color: #fff; color: var(--good); }
+.hw-mark[aria-pressed='true'] .hw-tick { background: #fff; border-color: #fff; color: var(--good); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .hw-mark[aria-pressed='true'] { color: #0f2414; } }
 :root[data-theme='dark'] .hw-mark[aria-pressed='true'] { color: #0f2414; }
 .item.done { background: var(--good-bg); border-color: var(--good-line); border-left-color: var(--good); }
