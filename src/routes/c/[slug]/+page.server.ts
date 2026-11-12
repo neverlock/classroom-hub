@@ -44,6 +44,8 @@ export const load: PageServerLoad = async (event) => {
 		cards: main.cards,
 		upcoming: main.upcoming,
 		overdue: main.overdue,
+		/** entries this student (identified by รหัส) marked done; empty for visitors, whose marks live in their browser */
+		doneIds: main.doneIds,
 		subjects: formSubjects.map((s) => ({ id: s.id, code: s.code, name: s.name })),
 		actor: actor ? { display: actor.display, isSuper: actor.isSuper } : null,
 		student: student ? { seatNo: student.seatNo } : null

@@ -6,6 +6,7 @@
 	import type { CardView } from '#lib/types.js';
 	import CommentForm from './CommentForm.svelte';
 	import Linkified from './Linkified.svelte';
+	import MarkButton from './MarkButton.svelte';
 
 	interface Props {
 		card: CardView;
@@ -15,8 +16,10 @@
 		student: { seatNo: number } | null;
 		onedit: (card: CardView) => void;
 		onzoom: (src: string) => void;
+		/** "ทำแล้ว" toggle, passed only where the card is opened from the homework lists */
+		mark?: { done: boolean; toggle: () => void };
 	}
-	let { card, today, isAdmin, student, onedit, onzoom }: Props = $props();
+	let { card, today, isAdmin, student, onedit, onzoom, mark }: Props = $props();
 
 	let open = $state(false);
 	let sureCard = $state(false);
@@ -41,8 +44,12 @@
 	{/if}
 {/snippet}
 
-<article class="ecard" class:hw={card.hasHomework}>
-	<h3>{card.subject.code} {card.subject.name}</h3>
+<article class="ecard" class:hw={card.hasHomework} class:done={mark?.done}>
+	{#if mark && card.hasHomework}
+		<div class="hw-cardhead"><h3>{card.subject.code} {card.subject.name}</h3><MarkButton done={mark.done} ontoggle={mark.toggle} /></div>
+	{:else}
+		<h3>{card.subject.code} {card.subject.name}</h3>
+	{/if}
 	{#if card.subject.teacher}<div class="teacher">ผู้สอน: {card.subject.teacher}</div>{/if}
 	<p><b>📝 งานในคาบ:</b> <Linkified text={card.lesson} /></p>
 	{@render pics(card.photos)}
