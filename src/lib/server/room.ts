@@ -95,6 +95,26 @@ export function logoutAction(event: Ev) {
 	return { loggedOut: true as const };
 }
 
+/** Logout button: signs out of the room-admin login AND forgets the remembered student รหัส on this device. */
+export function logoutAllAction(event: Ev) {
+	clearAdminCookie(event.cookies, event.params.slug);
+	clearStudentCookie(event.cookies, event.params.slug);
+	return { loggedOut: true as const };
+}
+
+/** Login tab for students/parents: check the รหัส and remember it on this device (like typing it under a card does). */
+export async function studentLoginAction(event: Ev) {
+	const ctx = await roomContext(event);
+	if (!ctx.room.cls.active) return fail(403, { studentError: 'ห้องนี้ปิดอยู่ (อ่านอย่างเดียว) ล็อกอินไม่ได้' });
+	const code = String((await event.request.formData()).get('code') ?? '');
+	if (!code.trim()) return fail(400, { studentError: 'กรุณากรอกรหัส' });
+	// `student: null`: a typed code replaces whoever was remembered before
+	const who = await identifyStudent({ ...ctx, student: null }, code);
+	if ('error' in who) return fail(400, { studentError: who.error ?? 'ไม่พบรหัสนี้ในห้อง ลองใหม่อีกครั้ง' });
+	await rememberStudent(ctx, who.student.id);
+	return { studentLoggedIn: true as const };
+}
+
 export function forgetStudentAction(event: Ev) {
 	clearStudentCookie(event.cookies, event.params.slug);
 	return { forgotten: true as const };

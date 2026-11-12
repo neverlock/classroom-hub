@@ -4,7 +4,7 @@ import { todayInBangkok, isIsoDate } from '#lib/dates.js';
 import { attachments, comments, entries, subjects } from '#lib/server/db/schema.js';
 import { lengthError, MAX_COMMENT_IMAGES, MAX_ENTRY_IMAGES, readText } from '#lib/validate.js';
 import { loadMain } from '#lib/server/queries.js';
-import { adminContext, forgetStudentAction, identifyStudent, identifyWriter, loginAction, logoutAction, rememberStudent, roomContext } from '#lib/server/room.js';
+import { adminContext, forgetStudentAction, identifyStudent, identifyWriter, loginAction, logoutAllAction, rememberStudent, roomContext, studentLoginAction } from '#lib/server/room.js';
 import { pickFiles, saveImages } from '#lib/server/uploads.js';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -56,7 +56,8 @@ export const load: PageServerLoad = async (event) => {
 
 export const actions: Actions = {
 	login: loginAction,
-	logout: logoutAction,
+	studentLogin: studentLoginAction,
+	logout: logoutAllAction,
 	forgetStudent: forgetStudentAction,
 
 	saveEntry: async (event) => {

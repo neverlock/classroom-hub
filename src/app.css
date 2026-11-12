@@ -71,6 +71,10 @@ input[type='file'] { width: 100%; max-width: 100%; min-width: 0; font-size: 14px
 .authbtn { flex: none; align-self: stretch; min-height: 56px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font-weight: 700; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .authbtn svg { width: 18px; height: 18px; flex: none; }
 .authbtn[aria-expanded='true'] { background: var(--chip-bg); color: var(--chip-ink); }
+.ltabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--surface); border-radius: 12px; padding: 4px; margin-top: 12px; border: 1.5px solid var(--line); }
+.ltabs button { border: 0; background: transparent; border-radius: 9px; min-height: 48px; font-weight: 700; font-size: 15px; cursor: pointer; color: var(--muted); line-height: 1.2; padding: 0 6px; }
+.ltabs button small { display: block; font-size: 12px; font-weight: 500; }
+.ltabs button[aria-selected='true'] { background: var(--hw-bg); color: var(--ink); box-shadow: inset 0 0 0 2px var(--hw-line); }
 .whoami { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
 .whoami b { color: var(--ink); }
 .ptitle { font-family: var(--font-display); font-weight: 600; font-size: 17px; margin: 10px 0 0; }
