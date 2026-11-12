@@ -35,8 +35,7 @@
 	$effect(() => {
 		const isStudent = !!data.student;
 		const rows = data.reads;
-		const newest = data.newest;
-		untrack(() => reads.sync(isStudent, rows, newest));
+		untrack(() => reads.sync(isStudent, rows));
 	});
 	/** read state only matters on the current term; old terms are a read-only archive */
 	const liveReads = $derived(data.view?.isCurrent ? reads : undefined);

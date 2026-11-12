@@ -13,23 +13,18 @@ const headers = { 'cache-control': 'no-store' };
 /**
  * How far a student (identified by the signed cookie) has read each card.
  *   { entries: { [entryId]: lastCommentId } }   raises the read mark of those cards (never lowers it)
- *   { baseline: n }                             sets the first-visit baseline, only if there is none yet
- * Answers with all the student's rows (entryId 0 = baseline). Visitors without a รหัส get 401 and keep this in their browser.
+ * Answers with all the student's rows. Visitors without a รหัส get 401 and keep this in their browser.
  */
 export const POST: RequestHandler = async (event) => {
 	const { db, room, student } = await roomContext(event);
 	if (!student) error(401, 'ยังไม่ได้กรอกรหัส');
-	let body: { entries?: unknown; baseline?: unknown };
+	let body: { entries?: unknown };
 	try {
 		body = await event.request.json();
 	} catch {
 		error(400, 'ข้อมูลไม่ถูกต้อง');
 	}
 	const okId = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= MAX_COMMENT_ID;
-
-	if (okId(body.baseline)) {
-		await db.insert(commentReads).values({ studentId: student.id, entryId: 0, lastCommentId: body.baseline }).onConflictDoNothing();
-	}
 
 	if (body.entries && typeof body.entries === 'object') {
 		const wanted = Object.entries(body.entries as Record<string, unknown>)

@@ -190,8 +190,8 @@ export const homeworkMarks = sqliteTable(
 
 /**
  * How far a student (identified by รหัส) has read the comments of each card: the highest comment id seen.
- * `entry_id = 0` holds the baseline, so comments that existed before the student's first visit are not "new".
- * No foreign key on entry_id for that reason; deleting an entry removes its rows by hand.
+ * No foreign key on entry_id (an early design used `entry_id = 0` as a baseline row; nothing reads it now);
+ * deleting an entry removes its rows by hand.
  */
 export const commentReads = sqliteTable(
 	'comment_reads',

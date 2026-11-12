@@ -209,7 +209,7 @@ describe('homework "ทำแล้ว" marks against D1', () => {
 });
 
 describe('unread comment data against D1', () => {
-	it('gives other people\'s comment ids per homework row, flags own comments, and returns read marks and the newest id', async () => {
+	it('gives other people\'s comment ids per homework row, flags own comments, and returns read marks', async () => {
 		const cls = await db.insert(classes).values({ slug: 'unread' }).returning().get();
 		const term = await db.insert(terms).values({ classId: cls.id, name: 't', classLabel: 'x', startDate: '2026-08-01', endDate: '2027-03-31' }).returning().get();
 		await db.update(classes).set({ currentTermId: term.id }).where(eq(classes.id, cls.id));
@@ -225,7 +225,7 @@ describe('unread comment data against D1', () => {
 		const c3 = await say(e1.id, you.id, 2);
 		await say(e1.id, you.id, 2, true); // hidden: never counted
 		const c4 = await say(e2.id, you.id, 2);
-		await db.insert(commentReads).values([{ studentId: me.id, entryId: e1.id, lastCommentId: c1.id }, { studentId: me.id, entryId: 0, lastCommentId: 3 }]);
+		await db.insert(commentReads).values([{ studentId: me.id, entryId: e1.id, lastCommentId: c1.id }]);
 
 		const bundle = await loadRoomBundle(db, 'unread', null, me.id);
 		const mine = await loadMain(db, bundle!.room, { date: '2026-10-20' }, '2026-10-25', { admin: false, studentId: me.id });
@@ -233,8 +233,7 @@ describe('unread comment data against D1', () => {
 		expect(rows.get(e1.id)).toEqual([c1.id, c3.id]); // c2 is mine, the hidden one is gone
 		expect(rows.get(e2.id)).toEqual([c4.id]);
 		expect(mine.cards[0].comments.map((c) => [c.id, c.mine])).toEqual([[c1.id, false], [c2.id, true], [c3.id, false]]);
-		expect(mine.newest).toBe(c4.id);
-		expect(mine.reads.map((r) => [r.entryId, r.last]).sort()).toEqual([[0, 3], [e1.id, c1.id]].sort());
+		expect(mine.reads.map((r) => [r.entryId, r.last])).toEqual([[e1.id, c1.id]]);
 
 		// a visitor without an รหัส: nothing is "mine", no read marks
 		const anon = await loadMain(db, bundle!.room, { date: '2026-10-20' }, '2026-10-25', { admin: false, studentId: null });
