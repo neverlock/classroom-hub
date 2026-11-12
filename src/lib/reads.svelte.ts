@@ -9,8 +9,6 @@ import { unreadIds } from '#lib/unread.js';
 export class Reads {
 	/** entryId → highest comment id read on that card */
 	last = $state<Record<number, number>>({});
-	/** comments with an id up to this existed on the first visit and are never "new"; null = not known yet */
-	baseline = $state<number | null>(null);
 	#slug: string;
 	#key: string;
 	#server = false;
@@ -23,22 +21,22 @@ export class Reads {
 
 	/** Ids of the comments (by others) on this card that are new for the reader. */
 	unread(entryId: number, ids: number[]): number[] {
-		return unreadIds(ids, this.last[entryId], this.baseline);
+		return unreadIds(ids, this.last[entryId]);
 	}
 
-	#readLocal(): { last: Record<number, number>; baseline: number | null } {
+	#readLocal(): Record<number, number> {
 		try {
-			const raw = JSON.parse(localStorage.getItem(this.#key) ?? 'null') as { last?: Record<string, number>; baseline?: number } | null;
+			const raw = JSON.parse(localStorage.getItem(this.#key) ?? 'null') as { last?: Record<string, number> } | null;
 			const last: Record<number, number> = {};
 			for (const [k, v] of Object.entries(raw?.last ?? {})) if (Number.isInteger(Number(k)) && Number.isInteger(v)) last[Number(k)] = v;
-			return { last, baseline: Number.isInteger(raw?.baseline) ? (raw!.baseline as number) : null };
+			return last;
 		} catch {
-			return { last: {}, baseline: null };
+			return {};
 		}
 	}
 	#writeLocal() {
 		try {
-			localStorage.setItem(this.#key, JSON.stringify({ last: this.last, baseline: this.baseline }));
+			localStorage.setItem(this.#key, JSON.stringify({ last: this.last }));
 		} catch {
 			/* private window / blocked storage: read state just lasts for this visit */
 		}
@@ -61,38 +59,27 @@ export class Reads {
 	}
 	#apply(rows: { entryId: number; last: number }[]) {
 		const last: Record<number, number> = {};
-		let baseline: number | null = null;
-		for (const r of rows) {
-			if (r.entryId === 0) baseline = r.last;
-			else last[r.entryId] = r.last;
-		}
+		for (const r of rows) if (r.entryId > 0) last[r.entryId] = r.last; // entry 0 is a leftover of an earlier design
 		this.last = last;
-		this.baseline = baseline;
 	}
 
-	/** Call whenever the page data changes. `newest` is the highest comment id in the room right now. */
-	async sync(isStudent: boolean, serverRows: { entryId: number; last: number }[], newest: number) {
+	/** Call whenever the page data changes. */
+	async sync(isStudent: boolean, serverRows: { entryId: number; last: number }[]) {
 		this.#server = isStudent;
 		if (!isStudent) {
-			const local = this.#readLocal();
-			this.last = local.last;
-			this.baseline = local.baseline ?? newest; // first visit on this device: everything existing counts as read
-			if (local.baseline === null) this.#writeLocal();
+			this.last = this.#readLocal();
 			return;
 		}
 		this.#apply(serverRows);
 		const local = this.#readLocal();
-		const needBaseline = this.baseline === null;
-		const hasLocal = Object.keys(local.last).length > 0 || local.baseline !== null;
-		if (!needBaseline && !hasLocal) return;
-		if (this.#syncing) return;
+		if (Object.keys(local).length === 0 || this.#syncing) return;
 		this.#syncing = true;
-		const rows = await this.#post({ entries: local.last, baseline: needBaseline ? (local.baseline ?? newest) : undefined });
+		const rows = await this.#post({ entries: local });
 		this.#syncing = false;
 		if (rows) {
 			this.#apply(rows);
 			this.#clearLocal();
-		} else if (needBaseline) this.baseline = local.baseline ?? newest; // offline: still behave sensibly for now
+		}
 	}
 
 	/** The reader has seen the comments up to these ids (entryId → highest comment id on that card). */

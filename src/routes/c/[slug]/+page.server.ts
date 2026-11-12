@@ -46,10 +46,8 @@ export const load: PageServerLoad = async (event) => {
 		overdue: main.overdue,
 		/** entries this student (identified by รหัส) marked done; empty for visitors, whose marks live in their browser */
 		doneIds: main.doneIds,
-		/** how far this student has read each card (entryId 0 = baseline); empty for visitors, whose read state lives in their browser */
+		/** how far this student has read each card ; empty for visitors, whose read state lives in their browser */
 		reads: main.reads,
-		/** newest visible comment id in the room, the baseline for a first visit */
-		newest: main.newest,
 		subjects: formSubjects.map((s) => ({ id: s.id, code: s.code, name: s.name })),
 		actor: actor ? { display: actor.display, isSuper: actor.isSuper } : null,
 		student: student ? { seatNo: student.seatNo } : null

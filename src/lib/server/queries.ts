@@ -137,7 +137,7 @@ export function doneMarks(db: Db, classId: number, studentId: number | null) {
 		.where(and(eq(entries.classId, classId), eq(homeworkMarks.studentId, studentId ?? -1)));
 }
 
-/** How far this student has read each card (entry_id 0 = the baseline). Visitors without an รหัส (null) match nothing. */
+/** How far this student has read each card. Visitors without an รหัส (null) match nothing. */
 export function readRows(db: Db, studentId: number | null) {
 	return db.select({ entryId: commentReads.entryId, last: commentReads.lastCommentId }).from(commentReads).where(eq(commentReads.studentId, studentId ?? -1));
 }
@@ -152,15 +152,6 @@ function homeworkCommentIds(db: Db, classId: number, from: string, to: string) {
 		.orderBy(asc(comments.id));
 }
 
-/** Highest visible comment id in the room: the baseline for a reader's first visit. */
-function newestComment(db: Db, classId: number) {
-	return db
-		.select({ n: sql<number>`coalesce(max(${comments.id}), 0)`.as('newest') })
-		.from(comments)
-		.innerJoin(entries, eq(comments.entryId, entries.id))
-		.where(and(eq(entries.classId, classId), eq(entries.hidden, false), eq(comments.hidden, false)));
-}
-
 export async function loadMain(
 	db: Db,
 	room: Room,
@@ -171,7 +162,7 @@ export async function loadMain(
 	const { cls } = room;
 	const termId = Number(params.term);
 	const view = room.terms.find((t) => t.id === termId) ?? room.current ?? room.terms[0] ?? null;
-	if (!view) return { view: null, date: today, cards: [] as CardView[], upcoming: [] as HomeworkRow[], overdue: [] as HomeworkRow[], doneIds: [] as number[], reads: [] as { entryId: number; last: number }[], newest: 0, subjects: [] as (typeof subjects.$inferSelect)[] };
+	if (!view) return { view: null, date: today, cards: [] as CardView[], upcoming: [] as HomeworkRow[], overdue: [] as HomeworkRow[], doneIds: [] as number[], reads: [] as { entryId: number; last: number }[], subjects: [] as (typeof subjects.$inferSelect)[] };
 	const isCurrent = view.id === room.current?.id;
 
 	let date: string;
@@ -189,7 +180,7 @@ export async function loadMain(
 	// Everything the page needs for this date, in ONE round trip. Photos and comments are looked up by
 	// (class, date) through joins, so they do not have to wait for the list of cards.
 	const dayOf = and(eq(entries.classId, cls.id), eq(entries.entryDate, date), eq(entries.hidden, false));
-	const [rows, hwRows, pics, cs, cPics, subs, marks, readList, hwCs, newest] = (await batch(db, [
+	const [rows, hwRows, pics, cs, cPics, subs, marks, readList, hwCs] = (await batch(db, [
 		cardRows(db, dayOf),
 		db
 			.select({ id: entries.id, code: subjects.code, name: subjects.name, detail: entries.homeworkDetail, due: entries.homeworkDue })
@@ -211,8 +202,7 @@ export async function loadMain(
 		db.select().from(subjects).where(eq(subjects.classId, cls.id)).orderBy(asc(subjects.sortOrder), asc(subjects.id)),
 		doneMarks(db, cls.id, viewer.studentId),
 		readRows(db, viewer.studentId),
-		homeworkCommentIds(db, cls.id, view.startDate, addDays(view.endDate, 1)),
-		newestComment(db, cls.id)
+		homeworkCommentIds(db, cls.id, view.startDate, addDays(view.endDate, 1))
 	])) as [
 		CardRow[],
 		{ id: number; code: string; name: string; detail: string | null; due: string | null }[],
@@ -222,8 +212,7 @@ export async function loadMain(
 		(typeof subjects.$inferSelect)[],
 		{ entryId: number }[],
 		{ entryId: number; last: number }[],
-		{ id: number; entryId: number; studentId: number }[],
-		{ n: number }[]
+		{ id: number; entryId: number; studentId: number }[]
 	];
 
 	const cards = buildCards(rows, pics, cs, cPics, {
@@ -239,7 +228,7 @@ export async function loadMain(
 	const upcoming = isCurrent ? hwRows.filter((r) => (r.due ?? '') >= today).map(toRow) : [];
 	const overdue = hwRows.filter((r) => (r.due ?? '') < today).map(toRow).reverse();
 
-	return { view, date, cards, upcoming, overdue, doneIds: marks.map((m) => m.entryId), reads: readList, newest: newest[0]?.n ?? 0, subjects: subs };
+	return { view, date, cards, upcoming, overdue, doneIds: marks.map((m) => m.entryId), reads: readList, subjects: subs };
 }
 
 /**
